@@ -20,16 +20,13 @@ pub fn reloop(
             let terminator = bb
                 .terminator
                 .map_labels(|l| StructureLabel::GoTo(l.clone()));
-            (
-                lbl,
-                BasicBlock {
-                    body: bb.body,
-                    terminator,
-                    defined: bb.defined,
-                    live: bb.live,
-                    span: bb.span,
-                },
-            )
+            (lbl, BasicBlock {
+                body: bb.body,
+                terminator,
+                defined: bb.defined,
+                live: bb.live,
+                span: bb.span,
+            })
         })
         .collect();
 

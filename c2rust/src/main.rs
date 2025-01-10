@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use clap::{crate_authors, App, AppSettings, Arg};
+use clap::{App, AppSettings, Arg, crate_authors};
 use is_executable::IsExecutable;
 use std::borrow::Cow;
 use std::collections::HashMap;

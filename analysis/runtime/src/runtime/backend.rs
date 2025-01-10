@@ -3,7 +3,7 @@ use crossbeam_utils::Backoff;
 use enum_dispatch::enum_dispatch;
 use fs_err::{File, OpenOptions};
 use std::fmt::Debug;
-use std::io::{stderr, BufWriter, Write};
+use std::io::{BufWriter, Write, stderr};
 use std::sync::Arc;
 
 use bincode;

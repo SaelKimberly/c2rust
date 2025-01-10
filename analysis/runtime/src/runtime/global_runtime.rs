@@ -5,9 +5,9 @@ use once_cell::sync::OnceCell;
 use crate::events::Event;
 
 use super::{
-    scoped_runtime::{ExistingRuntime, ScopedRuntime},
-    skip::{skip_event, SkipReason},
     AnyError, Detect,
+    scoped_runtime::{ExistingRuntime, ScopedRuntime},
+    skip::{SkipReason, skip_event},
 };
 
 pub struct GlobalRuntime {

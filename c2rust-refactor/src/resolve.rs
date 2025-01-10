@@ -1,6 +1,6 @@
-use rustc::hir::def::{DefKind, Res};
-use rustc::hir::def_id::{DefId, CRATE_DEF_INDEX, LOCAL_CRATE};
 use rustc::hir::Node;
+use rustc::hir::def::{DefKind, Res};
+use rustc::hir::def_id::{CRATE_DEF_INDEX, DefId, LOCAL_CRATE};
 use rustc::hir::{ForeignMod, Mod};
 use rustc::ty::TyCtxt;
 use syntax::ast::Ident;
@@ -86,9 +86,7 @@ pub fn module_children(tcx: TyCtxt, did: DefId) -> Vec<(Symbol, Res)> {
                 module_children(tcx, krate_did)
             }
 
-            Use(ref path, _kind) => {
-                module_children(tcx, path.res.def_id())
-            }
+            Use(ref path, _kind) => module_children(tcx, path.res.def_id()),
 
             Mod(ref m) => {
                 let mut children = Vec::with_capacity(m.item_ids.len());

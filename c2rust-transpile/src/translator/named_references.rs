@@ -134,13 +134,10 @@ impl<'c> Translation<'c> {
                 let write =
                     mk().unary_expr(UnOp::Deref(Default::default()), mk().ident_expr(&ptr_name));
 
-                Ok(WithStmts::new(
-                    vec![compute_ref],
-                    NamedReference {
-                        lvalue: write.clone(),
-                        rvalue: Some(read(write)?),
-                    },
-                ))
+                Ok(WithStmts::new(vec![compute_ref], NamedReference {
+                    lvalue: write.clone(),
+                    rvalue: Some(read(write)?),
+                }))
             }
         })
     }

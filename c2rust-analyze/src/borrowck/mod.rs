@@ -5,11 +5,11 @@ use crate::context::{AnalysisCtxt, PermissionSet};
 use crate::dataflow::DataflowConstraints;
 use crate::labeled_ty::{LabeledTy, LabeledTyCtxt};
 use crate::pointer_id::GlobalPointerTable;
-use crate::util::{describe_rvalue, RvalueDesc};
+use crate::util::{RvalueDesc, describe_rvalue};
 use indexmap::{IndexMap, IndexSet};
 use log::{debug, info, warn};
 use rustc_hir::def_id::DefId;
-use rustc_middle::mir::{Body, LocalKind, Place, StatementKind, START_BLOCK};
+use rustc_middle::mir::{Body, LocalKind, Place, START_BLOCK, StatementKind};
 use rustc_middle::ty::{
     EarlyBoundRegion, GenericParamDefKind, List, OutlivesPredicate, PredicateKind, Region, Ty,
     TyKind,
@@ -292,22 +292,16 @@ fn run_polonius<'tcx>(
     let entry_point = maps.point(START_BLOCK, 0, SubPoint::Start);
     for local in mir.local_decls.indices() {
         if mir.local_kind(local) == LocalKind::Arg {
-            let path = maps.path(
-                &mut facts,
-                Place {
-                    local,
-                    projection: List::empty(),
-                },
-            );
+            let path = maps.path(&mut facts, Place {
+                local,
+                projection: List::empty(),
+            });
             facts.path_assigned_at_base.push((path, entry_point));
         } else {
-            let path = maps.path(
-                &mut facts,
-                Place {
-                    local,
-                    projection: List::empty(),
-                },
-            );
+            let path = maps.path(&mut facts, Place {
+                local,
+                projection: List::empty(),
+            });
             facts.path_moved_at_base.push((path, entry_point));
         }
     }

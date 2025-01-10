@@ -366,10 +366,10 @@ impl<'c> Translation<'c> {
                 Some(src),
             )));
 
-            let call = mk().call_expr(
-                atomic_func,
-                vec![mk().ident_expr(&arg0_name), mk().ident_expr(&arg1_name)],
-            );
+            let call = mk().call_expr(atomic_func, vec![
+                mk().ident_expr(&arg0_name),
+                mk().ident_expr(&arg1_name),
+            ]);
             let val = mk().binary_expr(binary_op, call, mk().ident_expr(arg1_name));
             let val = if is_nand {
                 // For nand, return `!(atomic_nand(arg0, arg1) & arg1)`

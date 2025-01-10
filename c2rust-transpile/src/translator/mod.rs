@@ -8,7 +8,7 @@ use std::result::Result; // To override syn::Result from glob import
 
 use dtoa;
 
-use failure::{err_msg, format_err, Fail};
+use failure::{Fail, err_msg, format_err};
 use indexmap::indexmap;
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, trace, warn};
@@ -21,9 +21,9 @@ use crate::diagnostics::TranslationResult;
 use crate::rust_ast::comment_store::CommentStore;
 use crate::rust_ast::item_store::ItemStore;
 use crate::rust_ast::set_span::SetSpan;
-use crate::rust_ast::{pos_to_span, SpanExt};
+use crate::rust_ast::{SpanExt, pos_to_span};
 use crate::translator::named_references::NamedReference;
-use c2rust_ast_builder::{mk, properties::*, Builder};
+use c2rust_ast_builder::{Builder, mk, properties::*};
 use c2rust_ast_printer::pprust::{self};
 
 use crate::c_ast::iterators::{DFExpr, SomeId};
@@ -32,8 +32,8 @@ use crate::cfg;
 use crate::convert_type::TypeConverter;
 use crate::renamer::Renamer;
 use crate::with_stmts::WithStmts;
-use crate::{c_ast, format_translation_err};
 use crate::{ExternCrate, ExternCrateDetails, TranspilerConfig};
+use crate::{c_ast, format_translation_err};
 use c2rust_ast_exporter::clang_ast::LRValue;
 
 mod assembly;
@@ -48,9 +48,9 @@ mod simd;
 mod structs;
 mod variadic;
 
-pub use crate::diagnostics::{TranslationError, TranslationErrorKind};
 use crate::CrateSet;
 use crate::PragmaVec;
+pub use crate::diagnostics::{TranslationError, TranslationErrorKind};
 
 pub const INNER_SUFFIX: &str = "_Inner";
 pub const PADDING_SUFFIX: &str = "_PADDING";
@@ -288,8 +288,8 @@ fn int_arg_metaitem(name: &str, arg: u128) -> NestedMeta {
     let lit = mk().int_unsuffixed_lit(arg);
     let inner = Meta::List(MetaList {
         path: mk().path(name),
-        paren_token: Default::default(),
-        nested: FromIterator::from_iter(
+        delimiter: Default::default(),
+        tokens: FromIterator::from_iter(
             vec![mk().nested_meta_item(NestedMeta::Lit(lit))].into_iter(),
         ),
     });
@@ -370,12 +370,15 @@ fn vec_expr(val: Box<Expr>, count: Box<Expr>) -> Box<Expr> {
 pub fn stmts_block(mut stmts: Vec<Stmt>) -> Block {
     match stmts.pop() {
         None => {}
-        Some(Stmt::Expr(Expr::Block(ExprBlock {
-            block, label: None, ..
-        }))) if stmts.is_empty() => return block,
+        Some(Stmt::Expr(
+            Expr::Block(ExprBlock {
+                block, label: None, ..
+            }),
+            _,
+        )) if stmts.is_empty() => return block,
         Some(mut s) => {
-            if let Stmt::Expr(e) = s {
-                s = Stmt::Semi(e, Default::default());
+            if let Stmt::Expr(e, None) = s {
+                s = Stmt::Expr(e, Some(Token![;]));
             }
             stmts.push(s);
         }
@@ -1276,18 +1279,15 @@ impl<'c> Translation<'c> {
         let mut features = vec![];
         features.extend(self.features.borrow().iter());
         features.extend(self.type_converter.borrow().features_used());
-        let mut pragmas: PragmaVec = vec![(
-            "allow",
-            vec![
-                "non_upper_case_globals",
-                "non_camel_case_types",
-                "non_snake_case",
-                "dead_code",
-                "mutable_transmutes",
-                "unused_mut",
-                "unused_assignments",
-            ],
-        )];
+        let mut pragmas: PragmaVec = vec![("allow", vec![
+            "non_upper_case_globals",
+            "non_camel_case_types",
+            "non_snake_case",
+            "dead_code",
+            "mutable_transmutes",
+            "unused_mut",
+            "unused_assignments",
+        ])];
 
         if self.features.borrow().contains("register_tool") {
             pragmas.push(("register_tool", vec!["c2rust"]));
@@ -1522,35 +1522,26 @@ impl<'c> Translation<'c> {
             .single_attr("used")
             .meta_item_attr(
                 AttrStyle::Outer,
-                mk().meta_list(
-                    "cfg_attr",
-                    vec![
-                        mk().nested_meta_item(mk().meta_namevalue("target_os", "linux")),
-                        mk().nested_meta_item(mk().meta_namevalue("link_section", ".init_array")),
-                    ],
-                ),
+                mk().meta_list("cfg_attr", vec![
+                    mk().nested_meta_item(mk().meta_namevalue("target_os", "linux")),
+                    mk().nested_meta_item(mk().meta_namevalue("link_section", ".init_array")),
+                ]),
             )
             .meta_item_attr(
                 AttrStyle::Outer,
-                mk().meta_list(
-                    "cfg_attr",
-                    vec![
-                        mk().nested_meta_item(mk().meta_namevalue("target_os", "windows")),
-                        mk().nested_meta_item(mk().meta_namevalue("link_section", ".CRT$XIB")),
-                    ],
-                ),
+                mk().meta_list("cfg_attr", vec![
+                    mk().nested_meta_item(mk().meta_namevalue("target_os", "windows")),
+                    mk().nested_meta_item(mk().meta_namevalue("link_section", ".CRT$XIB")),
+                ]),
             )
             .meta_item_attr(
                 AttrStyle::Outer,
-                mk().meta_list(
-                    "cfg_attr",
-                    vec![
-                        mk().nested_meta_item(mk().meta_namevalue("target_os", "macos")),
-                        mk().nested_meta_item(
-                            mk().meta_namevalue("link_section", "__DATA,__mod_init_func"),
-                        ),
-                    ],
-                ),
+                mk().meta_list("cfg_attr", vec![
+                    mk().nested_meta_item(mk().meta_namevalue("target_os", "macos")),
+                    mk().nested_meta_item(
+                        mk().meta_namevalue("link_section", "__DATA,__mod_init_func"),
+                    ),
+                ]),
             );
         let static_array_size = mk().lit_expr(mk().int_unsuffixed_lit(1));
         let static_ty = mk().array_ty(
@@ -2133,8 +2124,7 @@ impl<'c> Translation<'c> {
 
                 trace!(
                     "Expanding macro {:?}: {:?}",
-                    decl_id,
-                    self.ast_context[decl_id]
+                    decl_id, self.ast_context[decl_id]
                 );
 
                 let maybe_replacement = self.canonical_macro_replacement(
@@ -2919,7 +2909,7 @@ impl<'c> Translation<'c> {
             elt = self.variable_array_base_type(elt);
             let ty = self.convert_type(elt)?;
             mk().path_ty(vec![
-                mk().path_segment_with_args("Vec", mk().angle_bracketed_args(vec![ty]))
+                mk().path_segment_with_args("Vec", mk().angle_bracketed_args(vec![ty])),
             ])
         } else {
             self.convert_type(typ.ctype)?
@@ -3101,7 +3091,7 @@ impl<'c> Translation<'c> {
                             .borrow_mut()
                             .insert(CDeclId(expr_id.0), "vla")
                             .unwrap(); // try using declref name?
-                                       // TODO: store the name corresponding to expr_id
+                        // TODO: store the name corresponding to expr_id
 
                         let local = mk().local(
                             mk().ident_pat(name),
@@ -3215,8 +3205,7 @@ impl<'c> Translation<'c> {
 
         trace!(
             "Converting expr {:?}: {:?}",
-            expr_id,
-            self.ast_context[expr_id]
+            expr_id, self.ast_context[expr_id]
         );
 
         if self.tcfg.translate_const_macros {

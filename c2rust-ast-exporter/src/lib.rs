@@ -1,4 +1,4 @@
-use serde_cbor::{from_slice, Value};
+use serde_cbor::{Value, from_slice};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::io::{Error, ErrorKind};
@@ -101,18 +101,18 @@ extern "C" {
 unsafe fn marshal_result(result: *const ffi::ExportResult) -> HashMap<String, Vec<u8>> {
     let mut output = HashMap::new();
 
-    let n = (*result).entries as isize;
+    let n = (unsafe { *result }).entries as isize;
     for i in 0..n {
-        let res = &*result;
+        let res = unsafe { &*result };
 
         // Convert name field
-        let cname = CStr::from_ptr(*res.names.offset(i));
+        let cname = unsafe { CStr::from_ptr(*res.names.offset(i)) };
         let name = cname.to_str().unwrap().to_owned();
 
         // Convert CBOR bytes
         let csize = *res.sizes.offset(i);
         let cbytes = *res.bytes.offset(i);
-        let bytes = slice::from_raw_parts(cbytes, csize as usize);
+        let bytes = unsafe { slice::from_raw_parts(cbytes, csize as usize) };
         let mut v = Vec::new();
         v.extend_from_slice(bytes);
 

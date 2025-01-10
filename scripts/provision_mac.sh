@@ -3,15 +3,17 @@
 # complain if we're not on macOS
 UNAME=$(uname -s)
 if [ "$UNAME" != "Darwin" ]; then
-  echo >&2 "Run this script on a macOS host."; exit 1;
+  echo >&2 "Run this script on a macOS host."
+  exit 1
 fi
 
 # make sure we have all prerequisites
 prereqs=(brew clang)
 for prereq in "${prereqs[@]}"; do
-    type -P "$prereq" >/dev/null || {
-        echo >&2 "$prereq not in path."; exit 1;
-    }
+  type -P "$prereq" >/dev/null || {
+    echo >&2 "$prereq not in path."
+    exit 1
+  }
 done
 
 SCRIPT_DIR="$(dirname "$0")"

@@ -10,7 +10,7 @@ use print_bytes::println_lossy;
 
 fn print_cargo_path(name: &str, path: &Path) {
     print!("cargo:{name}");
-    println_lossy(path);
+    println_lossy(path.to_str().expect("path is not UTF-8").as_bytes());
 }
 
 pub struct SysRoot {
@@ -21,7 +21,7 @@ impl SysRoot {
     pub fn resolve() -> Self {
         let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
         let output = Command::new(rustc)
-            .args(&["--print", "sysroot"])
+            .args(["--print", "sysroot"])
             .output()
             .expect("could not invoke `rustc` to find rust sysroot");
         // trim, but `str::trim` doesn't exist on `[u8]`

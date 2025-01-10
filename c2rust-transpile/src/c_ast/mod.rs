@@ -368,6 +368,7 @@ impl TypedAstContext {
     }
 
     /// Predicate for pointers to types that are used to implement C's `va_list`.
+    #[allow(non_snake_case)]
     pub fn is_va_list(&self, typ: CTypeId) -> bool {
         use BuiltinVaListKind::*;
         match self.va_list_kind {
@@ -695,13 +696,10 @@ impl TypedAstContext {
     }
 
     pub fn has_inner_struct_decl(&self, decl_id: CDeclId) -> bool {
-        matches!(
-            self.index(decl_id).kind,
-            CDeclKind::Struct {
-                manual_alignment: Some(_),
-                ..
-            }
-        )
+        matches!(self.index(decl_id).kind, CDeclKind::Struct {
+            manual_alignment: Some(_),
+            ..
+        })
     }
 
     pub fn is_packed_struct_decl(&self, decl_id: CDeclId) -> bool {
@@ -2110,7 +2108,10 @@ mod tests {
                             Ordering::Equal => "==",
                             Ordering::Greater => ">",
                         });
-                        assert_eq!(ab, ac, "Total order (transitivity) has been violated: {a} {ab} {b} and {b} {bc} {c}, but {a} {ac} {c}");
+                        assert_eq!(
+                            ab, ac,
+                            "Total order (transitivity) has been violated: {a} {ab} {b} and {b} {bc} {c}, but {a} {ac} {c}"
+                        );
                     }
                 }
             }

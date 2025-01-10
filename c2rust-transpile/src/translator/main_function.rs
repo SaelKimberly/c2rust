@@ -25,7 +25,7 @@ impl<'c> Translation<'c> {
                         main_id,
                         k
                     )
-                    .into())
+                    .into());
                 }
             };
 

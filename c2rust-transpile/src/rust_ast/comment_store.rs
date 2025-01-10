@@ -21,12 +21,12 @@
 //!
 //! Comments cannot currently be attached before the close of a Block, or after all Items in a File.
 
-use crate::rust_ast::{pos_to_span, set_span::SetSpan, traverse, BytePos, SpanExt};
+use crate::rust_ast::{BytePos, SpanExt, pos_to_span, set_span::SetSpan, traverse};
 use c2rust_ast_printer::pprust::comments;
 use itertools::Itertools;
 use log::warn;
 use proc_macro2::{Span, TokenStream};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use std::collections::BTreeMap;
 use std::default::Default;
 use syn::__private::ToTokens;
@@ -302,8 +302,8 @@ pub fn insert_comment_attrs(attrs: &mut Vec<Attribute>, new_comments: SmallVec<[
             pound_token: Default::default(),
             style: AttrStyle::Inner(Default::default()),
             bracket_token: Default::default(),
-            path: make_comment_path(),
-            tokens,
+            meta: make_comment_path(),
+            // tokens,
         };
         attrs.push(attr);
     }

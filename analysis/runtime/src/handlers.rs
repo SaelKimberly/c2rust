@@ -132,21 +132,21 @@ pub fn ptr_project(mir_loc: MirLocId, ptr: usize, new_ptr: usize, proj_key: u64)
 pub fn ptr_copy(mir_loc: MirLocId, ptr: usize) {
     RUNTIME.send_event(Event {
         mir_loc,
-        kind: EventKind::CopyPtr(ptr as usize),
+        kind: EventKind::CopyPtr(ptr),
     });
 }
 
 pub fn ptr_contrive(mir_loc: MirLocId, ptr: usize) {
     RUNTIME.send_event(Event {
         mir_loc,
-        kind: EventKind::FromInt(ptr as usize),
+        kind: EventKind::FromInt(ptr),
     });
 }
 
 pub fn ptr_to_int(mir_loc: MirLocId, ptr: usize) {
     RUNTIME.send_event(Event {
         mir_loc,
-        kind: EventKind::ToInt(ptr as usize),
+        kind: EventKind::ToInt(ptr),
     });
 }
 
@@ -161,6 +161,7 @@ pub fn addr_of_local(mir_loc: MirLocId, ptr: usize, local: u32, size: u32) {
     });
 }
 
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn addr_of_sized<T: ?Sized>(mir_loc: MirLocId, ptr: *const T) {
     let size = unsafe { core::mem::size_of_val(&*ptr) };
     RUNTIME.send_event(Event {

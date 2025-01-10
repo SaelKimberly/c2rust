@@ -1,13 +1,14 @@
 #!/bin/bash
 
-if [[ "$EUID" -ne 0 ]]; then 
-    echo "Please run as root"; exit 1
+if [[ "$EUID" -ne 0 ]]; then
+    echo "Please run as root"
+    exit 1
 fi
 
 SCRIPT_DIR="$(dirname "$0")"
 
 function provisionMac() {
-  ${SCRIPT_DIR}/provision_mac.sh
+    ${SCRIPT_DIR}/provision_mac.sh
 }
 
 function provisionLinux() {
@@ -42,26 +43,27 @@ function provisionLinux() {
     fi
 
     case "${OS}" in
-        "Arch Linux"*)            ${SCRIPT_DIR}/provision_arch.sh;;
-        "Debian GNU/Linux"*)      ${SCRIPT_DIR}/provision_deb.sh;;
-        "Ubuntu"*)                ${SCRIPT_DIR}/provision_deb.sh;;
-        "Fedora"*)                ${SCRIPT_DIR}/provision_dnf.sh;;
-        # NOTE: CentOS and RHEL are much less developer friendly, skip for now
-        # "CentOS Linux"*)          ${SCRIPT_DIR}/provision_yum.sh;;
-        # "Red Hat Enterprise Linux Server"*)  ${SCRIPT_DIR}/provision_rpm.sh;;
-        *)                        unsupportedOS "UNKNOWN-DISTRO:${OS}";;
+    "Arch Linux"*) ${SCRIPT_DIR}/provision_arch.sh ;;
+    "Debian GNU/Linux"*) ${SCRIPT_DIR}/provision_deb.sh ;;
+    "Ubuntu"*) ${SCRIPT_DIR}/provision_deb.sh ;;
+    "Fedora"*) ${SCRIPT_DIR}/provision_dnf.sh ;;
+    # NOTE: CentOS and RHEL are much less developer friendly, skip for now
+    # "CentOS Linux"*)          ${SCRIPT_DIR}/provision_yum.sh;;
+    # "Red Hat Enterprise Linux Server"*)  ${SCRIPT_DIR}/provision_rpm.sh;;
+    *) unsupportedOS "UNKNOWN-DISTRO:${OS}" ;;
     esac
 }
 
 function unsupportedOS() {
-  echo "Provisioning on $1 is not supported"; exit 1
+    echo "Provisioning on $1 is not supported"
+    exit 1
 }
 
 unameOut="$(uname -s)"
 case "${unameOut}" in
-    Linux*)     provisionLinux;;
-    Darwin*)    provisionMac;;
-    CYGWIN*)    unsupportedOS "Cygwin";;
-    MINGW*)     unsupportedOS "MinGw";;
-    *)          unsupportedOS "UNKNOWN:${unameOut}";;
+Linux*) provisionLinux ;;
+Darwin*) provisionMac ;;
+CYGWIN*) unsupportedOS "Cygwin" ;;
+MINGW*) unsupportedOS "MinGw" ;;
+*) unsupportedOS "UNKNOWN:${unameOut}" ;;
 esac

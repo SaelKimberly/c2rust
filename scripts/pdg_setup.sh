@@ -91,7 +91,7 @@ c2rust-pdg() (
         --print write-permissions \
         --print counts \
         --output "${pdg}" \
-        > "${test_dir}/pdg.log"
+        >"${test_dir}/pdg.log"
 )
 
 c2rust-analyze-with-pdg() (

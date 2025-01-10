@@ -8,11 +8,11 @@ ARG BASE_IMAGE=ubuntu:bionic
 FROM ${BASE_IMAGE}
 LABEL maintainer="c2rust@immunant.com"
 
-ARG USER=docker
-ARG UID=1000
-ARG GID=1000
-ENV HOME=/home/$USER
-ENV DEBIAN_FRONTEND=noninteractive
+ARG USER=docker \
+    UID=1000 \
+    GID=1000
+ENV HOME=/home/$USER \
+    DEBIAN_FRONTEND=noninteractive
 
 USER root
 RUN groupadd -f -g $GID $USER
@@ -32,9 +32,9 @@ USER $USER
 ARG RUST_VER
 RUN RUST_VER=$RUST_VER /tmp/provision_rust.sh
 
-ENV PATH="/home/${USER}/.cargo/bin:${PATH}"
-ENV CARGO_HOME="/tmp/.cargo"
-ENV RUSTUP_HOME="/home/${USER}/.rustup"
+ENV PATH="/home/${USER}/.cargo/bin:${PATH}"\
+    CARGO_HOME="/tmp/.cargo"\
+    RUSTUP_HOME="/home/${USER}/.rustup"
 
 # Need to switch back to root for Azure DevOps compatibility
 USER root

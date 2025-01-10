@@ -4,7 +4,7 @@ use log::debug;
 use rustc_ast::ast::AttrKind;
 use rustc_const_eval::interpret::Scalar;
 use rustc_hir::def::DefKind;
-use rustc_hir::def_id::{DefId, LocalDefId, CRATE_DEF_INDEX};
+use rustc_hir::def_id::{CRATE_DEF_INDEX, DefId, LocalDefId};
 use rustc_middle::mir::{
     Body, Constant, Field, Local, Mutability, Operand, PlaceElem, PlaceRef, ProjectionElem, Rvalue,
 };
@@ -12,7 +12,7 @@ use rustc_middle::ty::{
     self, AdtDef, DefIdTree, EarlyBinder, FnSig, GenericArg, List, Subst, SubstsRef, Ty, TyCtxt,
     TyKind, UintTy,
 };
-use rustc_span::symbol::{sym, Symbol};
+use rustc_span::symbol::{Symbol, sym};
 use rustc_type_ir::IntTy;
 use std::fmt::Debug;
 
@@ -492,6 +492,7 @@ impl<'a, T: ?Sized> PhantomLifetime<'a> for T {}
 /// For rule 4, this holds because  if `*A` is a fat ptr,
 /// `A` is unsized, and thus `[A; N]` is ill-formed to begin with.  
 /// For (almost) rule 5, this holds because `*[A]` is always a fat ptr.
+#[allow(non_snake_case)]
 pub fn is_transmutable_to<'tcx>(from: Ty<'tcx>, to: Ty<'tcx>) -> bool {
     let transmutable_ints = || {
         use IntTy::*;

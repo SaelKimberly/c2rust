@@ -149,7 +149,7 @@ fn use_tree_with_prefix(prefix: Path, leaf: UseTree) -> UseTree {
 }
 
 fn punct<T, P: Default>(x: Vec<T>) -> Punctuated<T, P> {
-    Punctuated::from_iter(x.into_iter())
+    Punctuated::from_iter(x)
 }
 
 fn punct_box<T, P: Default>(x: Vec<Box<T>>) -> Punctuated<T, P> {
@@ -196,14 +196,14 @@ impl<L: Make<Ident>> Make<Label> for L {
     }
 }
 
-impl<'a> Make<Path> for &'a str {
+impl Make<Path> for &str {
     fn make(self, mk: &Builder) -> Path {
         let v = vec![self];
         Make::<Path>::make(v, mk)
     }
 }
 
-impl<'a> Make<Visibility> for &'a str {
+impl Make<Visibility> for &str {
     fn make(self, mk_: &Builder) -> Visibility {
         match self {
             "pub" => Visibility::Public(VisPublic {
@@ -230,7 +230,7 @@ impl<'a> Make<Visibility> for &'a str {
     }
 }
 
-impl<'a> Make<Abi> for &'a str {
+impl Make<Abi> for &str {
     fn make(self, mk: &Builder) -> Abi {
         Abi {
             extern_token: Token![extern](mk.span),
@@ -240,7 +240,7 @@ impl<'a> Make<Abi> for &'a str {
     }
 }
 
-impl<'a> Make<Extern> for &'a str {
+impl Make<Extern> for &str {
     fn make(self, _mk: &Builder) -> Extern {
         Extern::Explicit(self.to_owned())
     }
@@ -252,7 +252,7 @@ impl Make<Extern> for Abi {
     }
 }
 
-impl<'a> Make<Mutability> for &'a str {
+impl Make<Mutability> for &str {
     fn make(self, _mk: &Builder) -> Mutability {
         match self {
             "" | "imm" | "immut" | "immutable" => Mutability::Immutable,
@@ -262,7 +262,7 @@ impl<'a> Make<Mutability> for &'a str {
     }
 }
 
-impl<'a> Make<Unsafety> for &'a str {
+impl Make<Unsafety> for &str {
     fn make(self, _mk: &Builder) -> Unsafety {
         match self {
             "" | "safe" | "normal" => Unsafety::Normal,
@@ -272,7 +272,7 @@ impl<'a> Make<Unsafety> for &'a str {
     }
 }
 
-impl<'a> Make<Constness> for &'a str {
+impl Make<Constness> for &str {
     fn make(self, _mk: &Builder) -> Constness {
         match self {
             "" | "normal" | "not-const" => Constness::NotConst,
@@ -282,7 +282,7 @@ impl<'a> Make<Constness> for &'a str {
     }
 }
 
-impl<'a> Make<UnOp> for &'a str {
+impl Make<UnOp> for &str {
     fn make(self, _mk: &Builder) -> UnOp {
         match self {
             "deref" | "*" => UnOp::Deref(Default::default()),
@@ -537,13 +537,9 @@ impl Builder {
         let mut tokens = TokenStream::new();
         let comma_token = Token![,](self.span);
         let mut it = list.nested.into_iter();
-        tokens.extend(
-            Some(proc_macro2::TokenTree::Punct(proc_macro2::Punct::new(
-                '(',
-                proc_macro2::Spacing::Alone,
-            )))
-            .into_iter(),
-        );
+        tokens.extend(Some(proc_macro2::TokenTree::Punct(
+            proc_macro2::Punct::new('(', proc_macro2::Spacing::Alone),
+        )));
         if let Some(value) = it.next() {
             value.to_tokens(&mut tokens);
         }
@@ -551,13 +547,9 @@ impl Builder {
             comma_token.to_tokens(&mut tokens);
             value.to_tokens(&mut tokens);
         }
-        tokens.extend(
-            Some(proc_macro2::TokenTree::Punct(proc_macro2::Punct::new(
-                ')',
-                proc_macro2::Spacing::Alone,
-            )))
-            .into_iter(),
-        );
+        tokens.extend(Some(proc_macro2::TokenTree::Punct(
+            proc_macro2::Punct::new(')', proc_macro2::Spacing::Alone),
+        )));
         PreparedMetaItem {
             path: list.path,
             tokens,
@@ -1132,18 +1124,15 @@ impl Builder {
         let else_branch = else_branch.map(|e| {
             // The else branch in libsyntax must be one of these three cases,
             // otherwise we have to manually add the block around the else expression
-            (
-                Token![else](self.span),
-                match &*e {
-                    Expr::If(..)
-                    | Expr::Block(ExprBlock {
-                        attrs: _,
-                        label: None,
-                        block: _,
-                    }) => e,
-                    _ => mk().block_expr(mk().block(vec![mk().expr_stmt(e)])),
-                },
-            )
+            (Token![else](self.span), match &*e {
+                Expr::If(..)
+                | Expr::Block(ExprBlock {
+                    attrs: _,
+                    label: None,
+                    block: _,
+                }) => e,
+                _ => mk().block_expr(mk().block(vec![mk().expr_stmt(e)])),
+            })
         });
 
         Box::new(Expr::If(ExprIf {
@@ -1419,7 +1408,7 @@ impl Builder {
     pub fn cvar_args_ty(self) -> Box<Type> {
         let dot = TokenTree::Punct(proc_macro2::Punct::new('.', proc_macro2::Spacing::Joint));
         let dots = vec![dot.clone(), dot.clone(), dot];
-        Box::new(Type::Verbatim(TokenStream::from_iter(dots.into_iter())))
+        Box::new(Type::Verbatim(TokenStream::from_iter(dots)))
     }
 
     // Stmts
@@ -2261,13 +2250,13 @@ fn has_rightmost_cast(expr: &Expr) -> bool {
         Expr::Unary(ExprUnary {
             attrs: _,
             op: _,
-            ref expr,
+            expr,
         }) => has_rightmost_cast(expr),
         Expr::Binary(ExprBinary {
             attrs: _,
             left: _,
             op: _,
-            ref right,
+            right,
         }) => has_rightmost_cast(right),
         _ => false,
     }

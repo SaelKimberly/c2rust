@@ -9,11 +9,11 @@ C2RUST_DIR="$(dirname "${SCRIPT_DIR}")"
 source ${SCRIPT_DIR}/pdg_setup.sh
 
 # Usage: `./pdg.sh <test crate dir> <test binary args...>`
-# 
+#
 # Environment Variables: see `scripts/pdg_functions.sh` for a full list.
-# 
+#
 # Instrument and run a test crate, create its PDG, and then run analysis on it.
-# 
+#
 # 1. Compile `c2rust-dynamic-instrumentation`.
 # 2. Redirect `c2rust-dynamic-instrumentation` stdout to `instrument.out.log` in the test crate directory,
 #    as it prints a lot of debugging info currently.

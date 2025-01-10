@@ -1,111 +1,115 @@
+from __future__ import annotations
 
-import os
-import re
-import sys
-import json
-import errno
-import psutil
-import signal
-import logging
 import argparse
-import platform
+import errno
+import json
+import logging
 import multiprocessing
-
+import os
+import platform
+import re
+import signal
+import sys
 from pathlib import Path
-from typing import Any, Dict, List, NoReturn, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, ClassVar, LiteralString, NoReturn
 
 import plumbum as pb
-
-from plumbum.machines import LocalCommand as Command
+import psutil
 from query_toml import query_toml
+
+if TYPE_CHECKING:
+    from plumbum.commands import BaseCommand
+    from plumbum.machines import LocalCommand as Command
 
 
 class Colors:
     # Terminal escape codes
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    NO_COLOR = '\033[0m'
+    OKBLUE = "\033[94m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    NO_COLOR = "\033[0m"
 
 
 class Config:
     # use custom build directory suffix if requested via env. variable
-    BUILD_SUFFIX = os.getenv('C2RUST_BUILD_SUFFIX') or ""
+    BUILD_SUFFIX = os.getenv("C2RUST_BUILD_SUFFIX") or ""
     BUILD_TYPE = "release"
 
     NCPUS = str(multiprocessing.cpu_count())
 
     ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
     ROOT_DIR = os.path.abspath(os.path.join(ROOT_DIR, os.pardir))
-    BUILD_DIR = os.path.join(ROOT_DIR, 'build' + BUILD_SUFFIX)
-    RREF_DIR = os.path.join(ROOT_DIR, 'c2rust-refactor')
-    C2RUST_DIR = os.path.join(ROOT_DIR, 'c2rust')
+    BUILD_DIR = os.path.join(ROOT_DIR, "build" + BUILD_SUFFIX)
+    RREF_DIR = os.path.join(ROOT_DIR, "c2rust-refactor")
+    C2RUST_DIR = os.path.join(ROOT_DIR, "c2rust")
     CROSS_CHECKS_DIR = os.path.join(ROOT_DIR, "cross-checks")
-    REMON_SUBMOD_DIR = os.path.join(CROSS_CHECKS_DIR, 'ReMon')
+    REMON_SUBMOD_DIR = os.path.join(CROSS_CHECKS_DIR, "ReMon")
     LIBFAKECHECKS_DIR = os.path.join(CROSS_CHECKS_DIR, "libfakechecks")
     LIBCLEVRBUF_DIR = os.path.join(REMON_SUBMOD_DIR, "libclevrbuf")
-    EXAMPLES_DIR = os.path.join(ROOT_DIR, 'examples')
-    AST_EXPO_DIR = os.path.join(ROOT_DIR, 'c2rust-ast-exporter')
-    AST_EXPO_SRC_DIR = os.path.join(AST_EXPO_DIR, 'src')
-    AST_EXPO_PRJ_DIR = os.path.join(AST_EXPO_DIR, 'xcode')
-    RUST_CHECKS_DIR = os.path.join(CROSS_CHECKS_DIR, 'rust-checks')
+    EXAMPLES_DIR = os.path.join(ROOT_DIR, "examples")
+    AST_EXPO_DIR = os.path.join(ROOT_DIR, "c2rust-ast-exporter")
+    AST_EXPO_SRC_DIR = os.path.join(AST_EXPO_DIR, "src")
+    AST_EXPO_PRJ_DIR = os.path.join(AST_EXPO_DIR, "xcode")
+    RUST_CHECKS_DIR = os.path.join(CROSS_CHECKS_DIR, "rust-checks")
 
-    TRANSPILE_CRATE_DIR = os.path.join(ROOT_DIR, 'c2rust-transpile')
-    REFACTOR_CRATE_DIR = os.path.join(ROOT_DIR, 'c2rust-refactor')
-    AST_BUILDER_CRATE_DIR = os.path.join(ROOT_DIR, 'c2rust-ast-builder')
-    AST_EXPORTER_CRATE_DIR = os.path.join(ROOT_DIR, 'c2rust-ast-exporter')
-    BITFIELDS_CRATE_DIR = os.path.join(ROOT_DIR, 'c2rust-bitfields')
-    XCHECK_PLUGIN_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, 'rustc-plugin')
-    XCHECK_RUNTIME_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, 'runtime')
-    XCHECK_DERIVE_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, 'derive-macros')
-    XCHECK_BACKEND_DYNAMIC_DLSYM_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, 'backends', 'dynamic-dlsym')
-    XCHECK_CONFIG_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, 'config')
-    MACROS_CRATE_DIR = os.path.join(ROOT_DIR, 'c2rust-macros')
-    AST_PRINTER_CRATE_DIR = os.path.join(ROOT_DIR, 'c2rust-ast-printer')
+    TRANSPILE_CRATE_DIR = os.path.join(ROOT_DIR, "c2rust-transpile")
+    REFACTOR_CRATE_DIR = os.path.join(ROOT_DIR, "c2rust-refactor")
+    AST_BUILDER_CRATE_DIR = os.path.join(ROOT_DIR, "c2rust-ast-builder")
+    AST_EXPORTER_CRATE_DIR = os.path.join(ROOT_DIR, "c2rust-ast-exporter")
+    BITFIELDS_CRATE_DIR = os.path.join(ROOT_DIR, "c2rust-bitfields")
+    XCHECK_PLUGIN_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, "rustc-plugin")
+    XCHECK_RUNTIME_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, "runtime")
+    XCHECK_DERIVE_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, "derive-macros")
+    XCHECK_BACKEND_DYNAMIC_DLSYM_CRATE_DIR = os.path.join(
+        RUST_CHECKS_DIR, "backends", "dynamic-dlsym"
+    )
+    XCHECK_CONFIG_CRATE_DIR = os.path.join(RUST_CHECKS_DIR, "config")
+    MACROS_CRATE_DIR = os.path.join(ROOT_DIR, "c2rust-macros")
+    AST_PRINTER_CRATE_DIR = os.path.join(ROOT_DIR, "c2rust-ast-printer")
 
     CBOR_PREFIX = os.path.join(BUILD_DIR, "tinycbor")
 
     LLVM_VER = "7.0.0"
     LLVM_ARCHIVE_URLS = None  # initialized by _init_llvm_ver_deps
-    OLD_LLVM_ARCHIVE_URLS = [
-        'http://releases.llvm.org/{ver}/llvm-{ver}.src.tar.xz',
-        'http://releases.llvm.org/{ver}/cfe-{ver}.src.tar.xz',
-        'http://releases.llvm.org/{ver}/compiler-rt-{ver}.src.tar.xz',
+    OLD_LLVM_ARCHIVE_URLS: ClassVar[list[LiteralString]] = [
+        "http://releases.llvm.org/{ver}/llvm-{ver}.src.tar.xz",
+        "http://releases.llvm.org/{ver}/cfe-{ver}.src.tar.xz",
+        "http://releases.llvm.org/{ver}/compiler-rt-{ver}.src.tar.xz",
         # 'http://releases.llvm.org/{ver}/clang-tools-extra-{ver}.src.tar.xz',
     ]
     # Since LLVM version 10, sources have been hosted on Github.
-    GITHUB_LLVM_ARCHIVE_URLS = [
-        'https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/llvm-{ver}.src.tar.xz',
-        'https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/clang-{ver}.src.tar.xz',
-        'https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/compiler-rt-{ver}.src.tar.xz',
+    GITHUB_LLVM_ARCHIVE_URLS: ClassVar[list[LiteralString]] = [
+        "https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/llvm-{ver}.src.tar.xz",
+        "https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/clang-{ver}.src.tar.xz",
+        "https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/compiler-rt-{ver}.src.tar.xz",
         # 'https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/clang-tools-extra-{ver}.src.tar.xz',
     ]
     # See http://releases.llvm.org/download.html#7.0.0
-    LLVM_PUBKEY = "scripts/llvm-{ver}-key.asc".format(ver=LLVM_VER)
+    LLVM_PUBKEY = f"scripts/llvm-{LLVM_VER}-key.asc"
     LLVM_PUBKEY = os.path.join(ROOT_DIR, LLVM_PUBKEY)
-    LLVM_SRC = os.path.join(BUILD_DIR, 'llvm-{ver}/src'.format(ver=LLVM_VER))
-    LLVM_CFG_DIR = os.path.join(LLVM_SRC, 'cmake/modules')
-    LLVM_BLD = os.path.join(
-        BUILD_DIR, 'llvm-{ver}/build'.format(ver=LLVM_VER))
-    LLVM_INSTALL = os.path.join(
-        BUILD_DIR, 'llvm-{ver}/install'.format(ver=LLVM_VER))
-    LLVM_BIN = os.path.join(LLVM_INSTALL, 'bin')
+    LLVM_SRC = os.path.join(BUILD_DIR, f"llvm-{LLVM_VER}/src")
+    LLVM_CFG_DIR = os.path.join(LLVM_SRC, "cmake/modules")
+    LLVM_BLD = os.path.join(BUILD_DIR, f"llvm-{LLVM_VER}/build")
+    LLVM_INSTALL = os.path.join(BUILD_DIR, f"llvm-{LLVM_VER}/install")
+    LLVM_BIN = os.path.join(LLVM_INSTALL, "bin")
 
-    CLANG_XCHECK_PLUGIN_SRC = os.path.join(CROSS_CHECKS_DIR,
-                                           "c-checks", "clang-plugin")
-    CLANG_XCHECK_PLUGIN_BLD = os.path.join(BUILD_DIR,
-                                           'clang-xcheck-plugin')
+    CLANG_XCHECK_PLUGIN_SRC = os.path.join(CROSS_CHECKS_DIR, "c-checks", "clang-plugin")
+    CLANG_XCHECK_PLUGIN_BLD = os.path.join(BUILD_DIR, "clang-xcheck-plugin")
 
     CC_DB_JSON = "compile_commands.json"
 
-    CUSTOM_RUST_NAME = query_toml(path=Path(ROOT_DIR).joinpath("rust-toolchain.toml"), query=("toolchain", "channel"))
+    CUSTOM_RUST_NAME = query_toml(
+        path=Path(ROOT_DIR).joinpath("rust-toolchain.toml"),
+        query=("toolchain", "channel"),
+    )
 
-    LLVM_SKIP_SIGNATURE_CHECKS  = False
+    LLVM_SKIP_SIGNATURE_CHECKS = False
 
     """
     Reflect changes to all configuration variables that depend on LLVM_VER
     """
+
     def _init_llvm_ver_deps(self) -> None:
         def llvm_major_ver_ge(test_ver: int) -> bool:
             (major, _, _) = self.LLVM_VER.split(".")
@@ -115,58 +119,60 @@ class Config:
             try:
                 return llvm_major_ver_ge(10)
             except ValueError:
-                emsg = "invalid LLVM version: {}".format(self.LLVM_VER)
-                raise ValueError(emsg)
+                emsg = f"invalid LLVM version: {self.LLVM_VER}"
+                raise ValueError(emsg) from None
 
-        urls = self.GITHUB_LLVM_ARCHIVE_URLS if use_github_archive_urls() \
+        urls = (
+            self.GITHUB_LLVM_ARCHIVE_URLS
+            if use_github_archive_urls()
             else self.OLD_LLVM_ARCHIVE_URLS
+        )
         # LLVM 15 and later distributes cmake files in a separate archive
         if llvm_major_ver_ge(15):
             urls.append(
-                'https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/cmake-{ver}.src.tar.xz',
+                "https://github.com/llvm/llvm-project/releases/download/llvmorg-{ver}/cmake-{ver}.src.tar.xz",
             )
         self.LLVM_ARCHIVE_URLS = [u.format(ver=self.LLVM_VER) for u in urls]
         self.LLVM_SIGNATURE_URLS = [s + ".sig" for s in self.LLVM_ARCHIVE_URLS]
-        self.LLVM_ARCHIVE_FILES = [os.path.basename(s)
-                                   for s in self.LLVM_ARCHIVE_URLS]
-        self.LLVM_ARCHIVE_DIRS = [s.replace(".tar.xz", "")
-                                  for s in self.LLVM_ARCHIVE_FILES]
-        self.LLVM_ARCHIVE_FILES = [os.path.join(Config.BUILD_DIR, s)
-                                   for s in self.LLVM_ARCHIVE_FILES]
-        self.LLVM_PUBKEY = "scripts/llvm-{ver}-key.asc".format(ver=self.LLVM_VER)
+        self.LLVM_ARCHIVE_FILES = [os.path.basename(s) for s in self.LLVM_ARCHIVE_URLS]
+        self.LLVM_ARCHIVE_DIRS = [
+            s.replace(".tar.xz", "") for s in self.LLVM_ARCHIVE_FILES
+        ]
+        self.LLVM_ARCHIVE_FILES = [
+            os.path.join(Config.BUILD_DIR, s) for s in self.LLVM_ARCHIVE_FILES
+        ]
+        self.LLVM_PUBKEY = f"scripts/llvm-{self.LLVM_VER}-key.asc"
         self.LLVM_PUBKEY = os.path.join(self.ROOT_DIR, self.LLVM_PUBKEY)
-        self.LLVM_SRC = os.path.join(self.BUILD_DIR, 'llvm-{ver}/src'.format(ver=self.LLVM_VER))
-        self.LLVM_CFG_DIR = os.path.join(self.LLVM_SRC, 'cmake/modules')
-        self.LLVM_BLD = os.path.join(
-            self.BUILD_DIR,
-            'llvm-{ver}/build'.format(ver=self.LLVM_VER))
+        self.LLVM_SRC = os.path.join(self.BUILD_DIR, f"llvm-{self.LLVM_VER}/src")
+        self.LLVM_CFG_DIR = os.path.join(self.LLVM_SRC, "cmake/modules")
+        self.LLVM_BLD = os.path.join(self.BUILD_DIR, f"llvm-{self.LLVM_VER}/build")
         self.LLVM_INSTALL = os.path.join(
-            self.BUILD_DIR,
-            'llvm-{ver}/install'.format(ver=self.LLVM_VER))
-        self.LLVM_BIN = os.path.join(self.LLVM_INSTALL, 'bin')
+            self.BUILD_DIR, f"llvm-{self.LLVM_VER}/install"
+        )
+        self.LLVM_BIN = os.path.join(self.LLVM_INSTALL, "bin")
         self.CLANG_XCHECK_PLUGIN_BLD = os.path.join(
-            self.BUILD_DIR,
-            'clang-xcheck-plugin')
+            self.BUILD_DIR, "clang-xcheck-plugin"
+        )
 
     def __init__(self) -> None:
         self._init_llvm_ver_deps()
         self.TRANSPILER: str = ""  # set in `update_args`
-        self.RREF_BIN: str = ""    # set in `update_args`
+        self.RREF_BIN: str = ""  # set in `update_args`
         self.C2RUST_BIN: str = ""  # set in `update_args`
         self.TARGET_DIR: str = ""  # set in `update_args`
         self.update_args()
 
-    def update_args(self, args: Optional[Any] = None) -> None:
-        build_type = 'debug' if args and args.debug else 'release'
-        llvm_ver = getattr(args, 'llvm_ver', self.LLVM_VER)
+    def update_args(self, args: Any | None = None) -> None:
+        build_type = "debug" if args and args.debug else "release"
+        llvm_ver = getattr(args, "llvm_ver", self.LLVM_VER)
 
         self.BUILD_TYPE = build_type
         self.LLVM_VER = llvm_ver
         # update dependent variables
         self._init_llvm_ver_deps()
 
-        env_target_dir = os.getenv('CARGO_TARGET_DIR')
-        self.TARGET_DIR = "{}/".format(build_type)
+        env_target_dir = os.getenv("CARGO_TARGET_DIR")
+        self.TARGET_DIR = f"{build_type}/"
         if env_target_dir:
             self.TARGET_DIR = os.path.join(env_target_dir, self.TARGET_DIR)
         else:
@@ -181,18 +187,24 @@ class Config:
         self.C2RUST_BIN = "c2rust"
         self.C2RUST_BIN = os.path.join(self.TARGET_DIR, self.C2RUST_BIN)
 
-        self.LLVM_SKIP_SIGNATURE_CHECKS = getattr(args, 'llvm_skip_signature_checks', False)
+        self.LLVM_SKIP_SIGNATURE_CHECKS = getattr(
+            args, "llvm_skip_signature_checks", False
+        )
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser) -> None:
         """Add common command-line arguments that CommonGlobals understands to
         construct necessary paths.
         """
-        dhelp = 'use debug build of toolchain (default build' \
-                ' is release+asserts)'
-        parser.add_argument('-d', '--debug', default=False,
-                            action='store_true', dest='debug',
-                            help=dhelp)
+        dhelp = "use debug build of toolchain (default build is release+asserts)"
+        parser.add_argument(
+            "-d",
+            "--debug",
+            default=False,
+            action="store_true",
+            dest="debug",
+            help=dhelp,
+        )
 
 
 config = Config()
@@ -201,10 +213,9 @@ config = Config()
 def get_host_triplet() -> str:
     if on_linux():
         return "x86_64-unknown-linux-gnu"
-    elif on_mac():
+    if on_mac():
         return "x86_64-apple-darwin"
-    else:
-        assert False, "not implemented"
+    raise AssertionError("not implemented")
 
 
 def update_or_init_submodule(submodule_path: str) -> None:
@@ -244,7 +255,7 @@ def on_x86() -> bool:
     """
     return true on x86-based hosts.
     """
-    return platform.uname().machine in ['x86_64', 'i386', 'i686' 'amd64']
+    return platform.uname().machine in {"x86_64", "i386", "i686amd64"}
 
 
 def on_mac() -> bool:
@@ -258,7 +269,7 @@ def on_linux() -> bool:
     return platform.system() == "Linux"
 
 
-def regex(raw: str) -> 're.Pattern':
+def regex(raw: str) -> re.Pattern:
     """
     Check that a string is a valid regex
     """
@@ -266,8 +277,8 @@ def regex(raw: str) -> 're.Pattern':
     try:
         return re.compile(raw)
     except re.error:
-        msg = "only:{0} is not a valid regular expression".format(raw)
-        raise argparse.ArgumentTypeError(msg)
+        msg = f"only:{raw} is not a valid regular expression"
+        raise argparse.ArgumentTypeError(msg) from None
 
 
 def die(emsg: str, ecode: int = 1) -> NoReturn:
@@ -275,7 +286,7 @@ def die(emsg: str, ecode: int = 1) -> NoReturn:
     log fatal error and exit with specified error code.
     """
     logging.fatal("error: %s", emsg)
-    quit(ecode)
+    sys.exit(ecode)
 
 
 def est_parallel_link_jobs() -> int:
@@ -291,15 +302,17 @@ def est_parallel_link_jobs() -> int:
     return int(mem_total / mem_per_job)
 
 
-def invoke(cmd: Command, *arguments: Union[str, List[str]]) -> Tuple[int, str, str]:
+def invoke(cmd: Command, *arguments: str | list[str]) -> tuple[int, str, str]:
     return _invoke(True, cmd, *arguments)
 
 
-def invoke_quietly(cmd: Command, *arguments: Union[str, List[str]]) -> Tuple[int, str, str]:
+def invoke_quietly(cmd: Command, *arguments: str | list[str]) -> tuple[int, str, str]:
     return _invoke(False, cmd, *arguments)
 
 
-def _invoke(console_output: bool, cmd: Command, *arguments: Union[str, List[str]]) -> Tuple[int, str, str]:
+def _invoke(
+    console_output: bool, cmd: Command, *arguments: str | list[str]
+) -> tuple[int, str, str]:
     try:
         if console_output:
             retcode, stdout, stderr = cmd[arguments] & pb.TEE()
@@ -311,11 +324,12 @@ def _invoke(console_output: bool, cmd: Command, *arguments: Union[str, List[str]
         if stderr:
             logging.debug("stderr from %s:\n%s", cmd, stderr)
 
-        return retcode, stdout, stderr
     except pb.ProcessExecutionError as pee:
-        msg = "cmd exited with code {}: {}".format(pee.retcode, cmd[arguments])
+        msg = f"cmd exited with code {pee.retcode}: {cmd[arguments]}"
         logging.critical(pee.stderr)
         die(msg, pee.retcode)
+    else:
+        return retcode, stdout, stderr
 
 
 def get_cmd_or_die(cmd: str) -> Command:
@@ -325,7 +339,7 @@ def get_cmd_or_die(cmd: str) -> Command:
     try:
         return pb.local[cmd]
     except pb.CommandNotFound:
-        die("{} not in path".format(cmd), errno.ENOENT)
+        die(f"{cmd} not in path", errno.ENOENT)
 
 
 def ensure_dir(path: str) -> None:
@@ -333,12 +347,12 @@ def ensure_dir(path: str) -> None:
         logging.debug("creating dir %s", path)
         os.makedirs(path, mode=0o744)
     if not os.path.isdir(path):
-        die("%s is not a directory" % path)
+        die(f"{path} is not a directory")
 
 
 def is_elf_exe(path: str) -> bool:
-    _file = pb.local.get('file')
-    out = _file(path)
+    file = pb.local.get("file")
+    out = file(path)
     return "LSB" in out and "ELF" in out and "Mach-O" not in out
 
 
@@ -348,15 +362,13 @@ def git_ignore_dir(path: str) -> None:
     """
     ignore_file = os.path.join(path, ".gitignore")
     if not os.path.isfile(ignore_file):
-        with open(ignore_file, "w") as handle:
+        with open(ignore_file, "w", encoding="utf-8") as handle:
             handle.write("*\n")
 
 
 def setup_logging(log_level: int = logging.INFO) -> None:
     logging.basicConfig(
-        filename=sys.argv[0].replace(".py", ".log"),
-        filemode='w',
-        level=logging.DEBUG
+        filename=sys.argv[0].replace(".py", ".log"), filemode="w", level=logging.DEBUG
     )
 
     console = logging.StreamHandler()
@@ -368,16 +380,15 @@ def binary_in_path(binary_name: str) -> bool:
     try:
         # raises CommandNotFound exception if not available.
         _ = pb.local[binary_name]
-        return True
+
     except pb.CommandNotFound:
         return False
+    else:
+        return True
 
 
 def json_pp_obj(json_obj: Any) -> str:
-    return json.dumps(json_obj,
-                      sort_keys=True,
-                      indent=2,
-                      separators=(',', ': '))
+    return json.dumps(json_obj, sort_keys=True, indent=2, separators=(",", ": "))
 
 
 def ensure_rustc_version(expected_version_str: str) -> None:
@@ -406,11 +417,11 @@ def ensure_rustfmt_version() -> None:
 
 def get_ninja_build_type(ninja_build_file: str) -> str:
     signature = "# CMAKE generated file: DO NOT EDIT!" + os.linesep
-    with open(ninja_build_file, "r") as handle:
+    with open(ninja_build_file, encoding="utf-8") as handle:
         lines = handle.readlines()
-        if not lines[0] == signature:
+        if lines[0] != signature:
             die("unexpected content in ninja.build: " + ninja_build_file)
-        r = re.compile(r'^#\s*Configurations?:\s*(\w+)')
+        r = re.compile(r"^#\s*Configurations?:\s*(\w+)")
         for line in lines:
             m = r.match(line)
             if m:
@@ -418,9 +429,8 @@ def get_ninja_build_type(ninja_build_file: str) -> str:
                 return m.group(1)
         die("missing content in ninja.build: " + ninja_build_file)
 
-def export_ast_from(ast_expo: pb.commands.BaseCommand,
-                    cc_db_path: str,
-                    **kwargs: str) -> str:
+
+def export_ast_from(ast_expo: BaseCommand, cc_db_path: str, **kwargs: str) -> str:
     """
     run c2rust-ast-exporter for a single compiler invocation.
 
@@ -429,7 +439,7 @@ def export_ast_from(ast_expo: pb.commands.BaseCommand,
     :return: path to generated cbor file.
     """
     # keys = ['arguments', 'directory', 'file']
-    keys = ['directory', 'file']  # 'arguments' is not required
+    keys = ["directory", "file"]  # 'arguments' is not required
     try:
         dir, filename = [kwargs[k] for k in keys]
         filepath = os.path.join(dir, filename)
@@ -449,10 +459,10 @@ def export_ast_from(ast_expo: pb.commands.BaseCommand,
         # log the command in a format that's easy to re-run
         export_cmd = str(ast_expo[args])
         logging.debug("export command:\n %s", export_cmd)
-        ast_expo[args] & pb.FG  # nopep8
+        ast_expo[args] & pb.FG  # type: ignore
         cbor_outfile = filepath + ".cbor"
         assert os.path.isfile(cbor_outfile), "missing: " + cbor_outfile
-        return cbor_outfile
+
     except pb.ProcessExecutionError as pee:
         if pee.retcode >= 0:
             mesg = os.strerror(pee.retcode)
@@ -462,50 +472,54 @@ def export_ast_from(ast_expo: pb.commands.BaseCommand,
 
         logging.fatal("command failed: %s", ast_expo[args])
         die("AST export failed: " + mesg, pee.retcode)
+    else:
+        return cbor_outfile
 
 
-def transpile(cc_db_path: str,
-              filter: Optional[str] = None,
-              extra_transpiler_args: List[str] = [],
-              emit_build_files: bool = True,
-              output_dir: Optional[str] = None,
-              emit_modules: bool = False,
-              main_module_for_build_files: Optional[str] = None,
-              cross_checks: bool = False,
-              use_fakechecks: bool = False,
-              cross_check_config: List[str] = [],
-              incremental_relooper: bool = True,
-              reorganize_definitions: bool = False) -> bool:
+def transpile(  # noqa: C901, PLR0917
+    cc_db_path: str,
+    filter: str | None = None,
+    extra_transpiler_args: list[str] | None = None,
+    emit_build_files: bool = True,
+    output_dir: str | None = None,
+    emit_modules: bool = False,
+    main_module_for_build_files: str | None = None,
+    cross_checks: bool = False,
+    use_fakechecks: bool = False,
+    cross_check_config: list[str] | None = None,
+    incremental_relooper: bool = True,
+    reorganize_definitions: bool = False,
+) -> bool:
     """
     run the transpiler on all C files in a compile commands database.
     """
     c2rust = get_cmd_or_die(config.C2RUST_BIN)
-    args = ['transpile', cc_db_path]
-    args.extend(extra_transpiler_args)
+    args = ["transpile", cc_db_path]
+    if extra_transpiler_args is not None:
+        args.extend(extra_transpiler_args)
     if emit_build_files:
-        args.append('--emit-build-files')
+        args.append("--emit-build-files")
     if output_dir:
-        args.append('--output-dir')
+        args.append("--output-dir")
         args.append(output_dir)
     if emit_modules:
-        args.append('--emit-modules')
+        args.append("--emit-modules")
     if main_module_for_build_files:
-        args.append('--binary')
+        args.append("--binary")
         args.append(main_module_for_build_files)
     if cross_checks:
-        args.append('--cross-checks')
+        args.append("--cross-checks")
     if use_fakechecks:
-        args.append('--use-fakechecks')
+        args.append("--use-fakechecks")
     if cross_check_config and cross_checks:
-        args.append('--cross-check-config')
-        for ccc in cross_check_config:
-            args.append(ccc)
+        args.append("--cross-check-config")
+        args.extend(cross_check_config)
     if not incremental_relooper:
-        args.append('--no-incremental-relooper')
+        args.append("--no-incremental-relooper")
     if reorganize_definitions:
-        args.append('--reorganize-definitions')
+        args.append("--reorganize-definitions")
     if filter:
-        args.append('--filter')
+        args.append("--filter")
         args.append(filter)
 
     logging.debug("translation command:\n %s", str(c2rust[args]))
@@ -521,14 +535,14 @@ def _get_gpg_cmd() -> Command:
     gpg = None
     try:
         # some systems install gpg v2.x as `gpg2`
-        gpg = pb.local['gpg2']
+        gpg = pb.local["gpg2"]
     except pb.CommandNotFound:
         gpg = get_cmd_or_die("gpg")
 
-    gpg.env = {'LANG': 'en'}  # request english output
+    gpg.env = {"LANG": "en"}  # type: ignore # request english output
     gpg_ver = gpg("--version")
     logging.debug("gpg version output:\n%s", gpg_ver)
-    emsg = "{} in path is too old".format(gpg.executable.basename)
+    emsg = f"{gpg.executable.basename} in path is too old"
     assert "gpg (GnuPG) 1.4" not in gpg_ver, emsg
 
     return gpg
@@ -537,10 +551,10 @@ def _get_gpg_cmd() -> Command:
 def install_sig(sigfile: str) -> None:
     gpg = _get_gpg_cmd()
 
-    retcode, _, stderr = gpg['--import', sigfile].run(retcode=None)
+    retcode, _, stderr = gpg["--import", sigfile].run(retcode=None)
     if retcode:
         logging.fatal(stderr)
-        die('could not import gpg key: ' + sigfile, retcode)
+        die("could not import gpg key: " + sigfile, retcode)
     else:
         logging.debug(stderr)
 
@@ -548,7 +562,7 @@ def install_sig(sigfile: str) -> None:
 def check_sig(afile: str, asigfile: str) -> None:
     gpg = _get_gpg_cmd()
 
-    def cleanup_on_failure(files: List[str]) -> None:
+    def cleanup_on_failure(files: list[str]) -> None:
         for f in files:
             if os.path.isfile(f):
                 os.remove(f)
@@ -556,9 +570,9 @@ def check_sig(afile: str, asigfile: str) -> None:
                 logging.warning("could not remove %s: not found.", f)
 
     if not os.path.isfile(afile):
-        die("archive file not found: %s" % afile)
+        die(f"archive file not found: {afile}")
     if not os.path.isfile(asigfile):
-        die("signature file not found: %s" % asigfile)
+        die(f"signature file not found: {asigfile}")
 
     # check that archive matches signature
     try:
@@ -566,10 +580,9 @@ def check_sig(afile: str, asigfile: str) -> None:
         logging.debug("checking signature of %s", os.path.basename(afile))
         # --auto-key-retrieve means that gpg will try to download
         # the pubkey from a keyserver if it isn't on the local keyring.
-        retcode, _, stderr = gpg['--keyserver-options',
-                                 'auto-key-retrieve',
-                                 '--verify',
-                                 asigfile, afile].run(retcode=None)
+        retcode, _, stderr = gpg[
+            "--keyserver-options", "auto-key-retrieve", "--verify", asigfile, afile
+        ].run(retcode=None)
         if retcode:
             cleanup_on_failure([afile, asigfile])
             logging.fatal(stderr)
@@ -579,10 +592,10 @@ def check_sig(afile: str, asigfile: str) -> None:
             die("gpg signature check failed: expected signature not found")
     except pb.ProcessExecutionError as pee:
         cleanup_on_failure([afile, asigfile])
-        die("gpg signature check failed: " + pee.message)
+        die("gpg signature check failed: " + (pee.message or ""))
 
 
-def download_archive(aurl: str, afile: str, asig: Optional[str] = None) -> None:
+def download_archive(aurl: str, afile: str, asig: str | None = None) -> None:
     curl = get_cmd_or_die("curl")
 
     def _download_helper(url: str, ofile: str) -> None:
@@ -590,14 +603,21 @@ def download_archive(aurl: str, afile: str, asig: Optional[str] = None) -> None:
             logging.info("downloading %s", os.path.basename(ofile))
             curl_args = [
                 url,
-                "-L",                       # follow redirects
-                "--max-redirs", "20",
-                "--connect-timeout", "5",   # timeout for reach attempt
-                "--max-time", "20",         # how long each retry will wait
-                "--retry", "5",
-                "--retry-delay", "0",       # exponential backoff
-                "--retry-max-time", "120",   # total time before we fail
-                "-o", ofile
+                "-L",  # follow redirects
+                "--max-redirs",
+                "20",
+                "--connect-timeout",
+                "5",  # timeout for reach attempt
+                "--max-time",
+                "20",  # how long each retry will wait
+                "--retry",
+                "5",
+                "--retry-delay",
+                "0",  # exponential backoff
+                "--retry-max-time",
+                "120",  # total time before we fail
+                "-o",
+                ofile,
             ]
             curl(*curl_args)
 

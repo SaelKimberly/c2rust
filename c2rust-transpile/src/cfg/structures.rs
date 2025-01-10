@@ -2,9 +2,9 @@
 
 use super::*;
 use log::warn;
-use syn::{spanned::Spanned as _, ExprBreak, ExprIf, ExprReturn, ExprUnary, Stmt};
+use syn::{ExprBreak, ExprIf, ExprReturn, ExprUnary, Stmt, spanned::Spanned as _};
 
-use crate::rust_ast::{comment_store, set_span::SetSpan, BytePos, SpanExt};
+use crate::rust_ast::{BytePos, SpanExt, comment_store, set_span::SetSpan};
 
 /// Convert a sequence of structures produced by Relooper back into Rust statements
 pub fn structured_cfg(
@@ -26,7 +26,7 @@ pub fn structured_cfg(
     // If the very last statement in the vector is a `return`, we can either cut it out or replace
     // it with the returned value.
     if cut_out_trailing_ret {
-        if let Some(Stmt::Expr(ret) | Stmt::Semi(ret, _)) = stmts.last() {
+        if let Some(Stmt::Expr(ret, _)) = stmts.last() {
             if let Expr::Return(ExprReturn { expr: None, .. }) = ret {
                 stmts.pop();
             }
@@ -278,22 +278,19 @@ fn structured_cfg_help<S: StructuredStatement<E = Box<Expr>, P = Pat, L = Label,
                     }
                 };
 
-                new_rest = S::mk_append(
-                    new_rest,
-                    match terminator {
-                        End => S::empty(),
-                        Jump(to) => branch(to)?,
-                        Branch(c, t, f) => S::mk_if(c.clone(), branch(t)?, branch(f)?),
-                        Switch { expr, cases } => {
-                            let branched_cases = cases
-                                .iter()
-                                .map(|&(ref pat, ref slbl)| Ok((pat.clone(), branch(slbl)?)))
-                                .collect::<TranslationResult<_>>()?;
+                new_rest = S::mk_append(new_rest, match terminator {
+                    End => S::empty(),
+                    Jump(to) => branch(to)?,
+                    Branch(c, t, f) => S::mk_if(c.clone(), branch(t)?, branch(f)?),
+                    Switch { expr, cases } => {
+                        let branched_cases = cases
+                            .iter()
+                            .map(|&(ref pat, ref slbl)| Ok((pat.clone(), branch(slbl)?)))
+                            .collect::<TranslationResult<_>>()?;
 
-                            S::mk_match(expr.clone(), branched_cases)
-                        }
-                    },
-                );
+                        S::mk_match(expr.clone(), branched_cases)
+                    }
+                });
             }
 
             Multiple { branches, then, .. } => {
@@ -530,7 +527,7 @@ impl StructureState {
                     }
                     (false, false) => {
                         fn is_expr(kind: &Stmt) -> bool {
-                            matches!(kind, Stmt::Expr(Expr::If(..) | Expr::Block(..)))
+                            matches!(kind, Stmt::Expr(Expr::If(..) | Expr::Block(..), Some(_)))
                         }
 
                         // Do the else statements contain a single If, IfLet or
@@ -542,7 +539,7 @@ impl StructureState {
                             let stmt_expr = els_stmts.swap_remove(0);
                             let stmt_expr_span = stmt_expr.span();
                             let mut els_expr = match stmt_expr {
-                                Stmt::Expr(e) => e,
+                                Stmt::Expr(e, _) => e,
                                 _ => panic!("is_els_expr out of sync"),
                             };
                             els_expr.set_span(stmt_expr_span);
@@ -605,7 +602,7 @@ impl StructureState {
                 let (body, body_span) = self.to_stmt(*body, comment_store);
 
                 // TODO: this is ugly but it needn't be. We are just pattern matching on particular ASTs.
-                if let Some(stmt @ &Stmt::Expr(ref expr)) = body.first() {
+                if let Some(stmt @ &Stmt::Expr(ref expr, _)) = body.first() {
                     let stmt_span = stmt.span();
                     let span = if !stmt_span.is_dummy() {
                         stmt_span
@@ -619,14 +616,16 @@ impl StructureState {
                         ..
                     }) = expr
                     {
-                        if let [Stmt::Semi(
-                            syn::Expr::Break(ExprBreak {
-                                label: None,
-                                expr: None,
-                                ..
-                            }),
-                            _token,
-                        )] = then_branch.stmts.as_slice()
+                        if let [
+                            Stmt::Semi(
+                                syn::Expr::Break(ExprBreak {
+                                    label: None,
+                                    expr: None,
+                                    ..
+                                }),
+                                _token,
+                            ),
+                        ] = then_branch.stmts.as_slice()
                         {
                             let e = mk().while_expr(
                                 not(cond),

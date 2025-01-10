@@ -8,7 +8,8 @@ SCRIPT_DIR="$(dirname "$0")"
 
 # TODO: might have to do something similar to support RHEL
 if [ "$ID" != "fedora" ]; then
-    echo >&2 "Run this script on a Fedora host."; exit 1;
+    echo >&2 "Run this script on a Fedora host."
+    exit 1
 fi
 
 # redhat-rpm-config avoids problem when pip3-installing psutils
@@ -34,4 +35,3 @@ pip3 install --upgrade pip
 # environment markers in install_requires
 pip3 install "setuptools >= 20.5" --disable-pip-version-check --quiet
 pip3 install -r $SCRIPT_DIR/requirements.txt --disable-pip-version-check --quiet
-

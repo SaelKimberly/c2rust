@@ -31,7 +31,7 @@ impl<'c> Translation<'c> {
             _ => {
                 return Err(TranslationError::generic(
                     "Expected declref when processing builtin",
-                ))
+                ));
             }
         };
 
@@ -40,7 +40,7 @@ impl<'c> Translation<'c> {
             _ => {
                 return Err(TranslationError::generic(
                     "Expected function when processing builtin",
-                ))
+                ));
             }
         };
 
@@ -187,41 +187,41 @@ impl<'c> Translation<'c> {
             "__builtin_prefetch" => self.convert_expr(ctx.unused(), args[0]),
 
             "__builtin_memcpy" | "__builtin_memcmp" | "__builtin_memmove" | "__builtin_strncmp"
-            | "__builtin_strncpy" | "__builtin_strncat" => self.convert_libc_fns(
-                builtin_name,
-                ctx,
-                args,
-                &[LibcFnArgType::Mem, LibcFnArgType::Mem, LibcFnArgType::Size],
-            ),
-            "__builtin_memchr" | "__builtin_memset" => self.convert_libc_fns(
-                builtin_name,
-                ctx,
-                args,
-                &[LibcFnArgType::Mem, LibcFnArgType::Int, LibcFnArgType::Size],
-            ),
-            "__builtin_strchr" | "__builtin_strrchr" => self.convert_libc_fns(
-                builtin_name,
-                ctx,
-                args,
-                &[LibcFnArgType::Mem, LibcFnArgType::Int],
-            ),
-            "__builtin_strndup" | "__builtin_strnlen" => self.convert_libc_fns(
-                builtin_name,
-                ctx,
-                args,
-                &[LibcFnArgType::Mem, LibcFnArgType::Size],
-            ),
+            | "__builtin_strncpy" | "__builtin_strncat" => {
+                self.convert_libc_fns(builtin_name, ctx, args, &[
+                    LibcFnArgType::Mem,
+                    LibcFnArgType::Mem,
+                    LibcFnArgType::Size,
+                ])
+            }
+            "__builtin_memchr" | "__builtin_memset" => {
+                self.convert_libc_fns(builtin_name, ctx, args, &[
+                    LibcFnArgType::Mem,
+                    LibcFnArgType::Int,
+                    LibcFnArgType::Size,
+                ])
+            }
+            "__builtin_strchr" | "__builtin_strrchr" => {
+                self.convert_libc_fns(builtin_name, ctx, args, &[
+                    LibcFnArgType::Mem,
+                    LibcFnArgType::Int,
+                ])
+            }
+            "__builtin_strndup" | "__builtin_strnlen" => {
+                self.convert_libc_fns(builtin_name, ctx, args, &[
+                    LibcFnArgType::Mem,
+                    LibcFnArgType::Size,
+                ])
+            }
             "__builtin_strdup" | "__builtin_strlen" => {
                 self.convert_libc_fns(builtin_name, ctx, args, &[LibcFnArgType::Mem])
             }
             "__builtin_strcmp" | "__builtin_strcat" | "__builtin_strcpy" | "__builtin_strcspn"
             | "__builtin_strpbrk" | "__builtin_strspn" | "__builtin_strstr" => self
-                .convert_libc_fns(
-                    builtin_name,
-                    ctx,
-                    args,
-                    &[LibcFnArgType::Mem, LibcFnArgType::Mem],
-                ),
+                .convert_libc_fns(builtin_name, ctx, args, &[
+                    LibcFnArgType::Mem,
+                    LibcFnArgType::Mem,
+                ]),
 
             "__builtin_add_overflow"
             | "__builtin_sadd_overflow"

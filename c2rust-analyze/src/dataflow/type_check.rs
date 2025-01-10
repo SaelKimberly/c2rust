@@ -5,8 +5,8 @@ use crate::pointee_type::PointeeTypes;
 use crate::pointer_id::PointerTable;
 use crate::recent_writes::RecentWrites;
 use crate::util::{
-    self, describe_rvalue, is_transmutable_ptr_cast, ty_callee, Callee, RvalueDesc,
-    UnknownDefCallee,
+    self, Callee, RvalueDesc, UnknownDefCallee, describe_rvalue, is_transmutable_ptr_cast,
+    ty_callee,
 };
 use assert_matches::assert_matches;
 use either::Either;
@@ -200,7 +200,9 @@ impl<'tcx> TypeChecker<'tcx, '_> {
                     }
                     Some(false) => {
                         self.do_assign_pointer_ids(to_lty.label, from_lty.label);
-                        ::log::warn!("TODO: unsupported ptr-to-ptr cast between pointee types not yet supported as safely transmutable: `{from_ty:?} as {to_ty:?}`");
+                        ::log::warn!(
+                            "TODO: unsupported ptr-to-ptr cast between pointee types not yet supported as safely transmutable: `{from_ty:?} as {to_ty:?}`"
+                        );
                     }
 
                     None => {} // not a ptr cast (no dataflow constraints needed); let rustc typeck this
@@ -763,21 +765,15 @@ impl<'tcx> TypeChecker<'tcx, '_> {
 fn visit_common<'tcx>(tc: &mut TypeChecker<'tcx, '_>, mir: &Body<'tcx>) {
     for (bb, bb_data) in mir.basic_blocks().iter_enumerated() {
         for (i, stmt) in bb_data.statements.iter().enumerate() {
-            tc.visit_statement(
-                stmt,
-                Location {
-                    block: bb,
-                    statement_index: i,
-                },
-            );
-        }
-        tc.visit_terminator(
-            bb_data.terminator(),
-            Location {
-                statement_index: bb_data.statements.len(),
+            tc.visit_statement(stmt, Location {
                 block: bb,
-            },
-        );
+                statement_index: i,
+            });
+        }
+        tc.visit_terminator(bb_data.terminator(), Location {
+            statement_index: bb_data.statements.len(),
+            block: bb,
+        });
     }
 }
 

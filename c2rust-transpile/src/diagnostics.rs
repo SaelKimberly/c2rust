@@ -1,5 +1,5 @@
 use colored::Colorize;
-use failure::{err_msg, Backtrace, Context, Error, Fail};
+use failure::{Backtrace, Context, Error, Fail, err_msg};
 use fern::colors::ColoredLevelConfig;
 use log::{Level, SetLoggerError};
 use std::collections::HashSet;
@@ -113,17 +113,26 @@ impl Display for TranslationErrorKind {
             OldLLVMSimd => {
                 if let Some(version) = get_clang_major_version() {
                     if version < 7 {
-                        return write!(f, "SIMD intrinsics require LLVM 7 or newer. Please build C2Rust against a newer LLVM version.");
+                        return write!(
+                            f,
+                            "SIMD intrinsics require LLVM 7 or newer. Please build C2Rust against a newer LLVM version."
+                        );
                     }
                 }
             }
 
             VaCopyNotImplemented => {
-                return write!(f, "Rust does not yet support a C-compatible va_copy which is required to translate this function. See https://github.com/rust-lang/rust/pull/59625");
+                return write!(
+                    f,
+                    "Rust does not yet support a C-compatible va_copy which is required to translate this function. See https://github.com/rust-lang/rust/pull/59625"
+                );
             }
 
             InvalidClangAst(_) => {
-                return write!(f, "Exported Clang AST was invalid. Check warnings above for unimplemented features.");
+                return write!(
+                    f,
+                    "Exported Clang AST was invalid. Check warnings above for unimplemented features."
+                );
             }
         }
         Ok(())

@@ -1,10 +1,10 @@
 use crate::borrowck::atoms::{AllFacts, AtomMaps, Loan, Origin, Path, Point, SubPoint};
-use crate::borrowck::{assign_origins, construct_adt_origins, LTy, LTyCtxt, Label, OriginParam};
-use crate::context::{const_alloc_id, find_static_for_alloc};
+use crate::borrowck::{LTy, LTyCtxt, Label, OriginParam, assign_origins, construct_adt_origins};
 use crate::context::{AnalysisCtxt, PermissionSet};
+use crate::context::{const_alloc_id, find_static_for_alloc};
 use crate::panic_detail;
 use crate::pointer_id::GlobalPointerTable;
-use crate::util::{self, ty_callee, Callee};
+use crate::util::{self, Callee, ty_callee};
 use assert_matches::assert_matches;
 use indexmap::IndexMap;
 use log::debug;
@@ -196,7 +196,9 @@ impl<'tcx> TypeChecker<'tcx, '_> {
                                 }
                                 for (op, origin) in l.label.origin_params {
                                     // constrain this origin to be 'static
-                                    debug!("constraining origin {op:?} ({origin:?}) to 'static lifetime");
+                                    debug!(
+                                        "constraining origin {op:?} ({origin:?}) to 'static lifetime"
+                                    );
                                     add_subset_base(static_origin, *origin);
                                     add_subset_base(*origin, static_origin);
                                 }

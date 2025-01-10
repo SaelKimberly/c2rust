@@ -6,7 +6,7 @@ mod solve;
 mod type_check;
 
 pub use self::constraint_set::{CTy, Constraint, ConstraintSet, VarTable};
-pub use self::solve::{solve_constraints, PointeeTypes};
+pub use self::solve::{PointeeTypes, solve_constraints};
 
 pub fn generate_constraints<'tcx>(
     acx: &AnalysisCtxt<'_, 'tcx>,

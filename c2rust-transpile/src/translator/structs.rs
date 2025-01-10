@@ -5,11 +5,11 @@
 use std::collections::HashSet;
 use std::ops::Index;
 
-use super::named_references::NamedReference;
 use super::TranslationError;
+use super::named_references::NamedReference;
 use crate::c_ast::{BinOp, CDeclId, CDeclKind, CExprId, CRecordId, CTypeId};
 use crate::diagnostics::TranslationResult;
-use crate::translator::{ExprContext, Translation, PADDING_SUFFIX};
+use crate::translator::{ExprContext, PADDING_SUFFIX, Translation};
 use crate::with_stmts::WithStmts;
 use c2rust_ast_builder::mk;
 use c2rust_ast_printer::pprust;
@@ -430,7 +430,7 @@ impl<'a> Translation<'a> {
             CDeclKind::Struct { fields: None, .. } => {
                 return Err(TranslationError::generic(
                     "Attempted to zero-initialize forward-declared struct",
-                ))
+                ));
             }
 
             _ => panic!("Struct literal declaration mismatch"),
@@ -789,11 +789,8 @@ impl<'a> Translation<'a> {
                         let name = self.renamer.borrow_mut().pick_name("rhs");
                         let name_ident = mk().mutbl().ident_pat(name.clone());
                         let temporary_stmt = mk().local(name_ident, None, Some(param_expr.clone()));
-                        let assignment_expr = mk().method_call_expr(
-                            lhs_expr,
-                            setter_name,
-                            vec![mk().ident_expr(name)],
-                        );
+                        let assignment_expr = mk()
+                            .method_call_expr(lhs_expr, setter_name, vec![mk().ident_expr(name)]);
 
                         stmts.push(mk().local_stmt(Box::new(temporary_stmt)));
                         stmts.push(mk().semi_stmt(assignment_expr));

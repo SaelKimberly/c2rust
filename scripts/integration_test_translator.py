@@ -1,31 +1,32 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
 import argparse
 import errno
 import logging
 import multiprocessing
 import os
-from shutil import rmtree
 import sys
 import tempfile
+from shutil import rmtree
 
 from common import (
     config as c,
-    pb,
-    get_cmd_or_die,
-    invoke,
-    get_rust_toolchain_libpath,
-    download_archive,
-    invoke_quietly,
+)
+from common import (
     die,
+    download_archive,
+    ensure_dir,
+    get_cmd_or_die,
+    get_rust_toolchain_libpath,
+    invoke,
+    invoke_quietly,
     on_mac,
+    pb,
     regex,
     setup_logging,
-    ensure_dir,
     transpile,
 )
-
 
 # LUA_URL = "https://www.lua.org/ftp/lua-5.3.4.tar.gz"
 # LUA_ARCHIVE = os.path.basename(LUA_URL)
@@ -39,8 +40,9 @@ RUBY_ARCHIVE = os.path.basename(RUBY_URL)
 RUBY_SRC = RUBY_ARCHIVE.replace(".tar.gz", "")
 RUBY_SRC = os.path.join(c.BUILD_DIR, RUBY_SRC)
 
-JSON_C_URL = "https://s3.amazonaws.com/" + \
-             "json-c_releases/releases/json-c-0.13.1.tar.gz"
+JSON_C_URL = (
+    "https://s3.amazonaws.com/" + "json-c_releases/releases/json-c-0.13.1.tar.gz"
+)
 JSON_C_ARCHIVE = os.path.basename(JSON_C_URL)
 JSON_C_SRC = JSON_C_ARCHIVE.replace(".tar.gz", "")
 JSON_C_SRC = os.path.join(c.BUILD_DIR, JSON_C_SRC)
@@ -64,15 +66,15 @@ int main() {
 }
 """
 
-minimal_cc_db = """ \
+minimal_cc_db = f""" \
 [
   {{
     "arguments": [ "cc", "-c", "test.c" ],
-    "directory": "{}",
+    "directory": "{tempfile.gettempdir()}",
     "file": "test.c"
   }}
 ]
-""".format(tempfile.gettempdir())
+"""
 
 
 def _test_minimal(code_snippet: str) -> bool:
@@ -80,27 +82,26 @@ def _test_minimal(code_snippet: str) -> bool:
 
     tempdir = tempfile.gettempdir()
     cfile = os.path.join(tempdir, "test.c")
-    with open(cfile, 'w') as fh:
+    with open(cfile, "w", encoding="utf-8") as fh:
         fh.write(code_snippet)
 
     # avoid warnings about missing compiler flags, not strictly required
     cc_json = os.path.join(tempdir, "compile_commands.json")
-    with open(cc_json, 'w') as fh:
+    with open(cc_json, "w", encoding="utf-8") as fh:
         fh.write(minimal_cc_db)
 
     ld_lib_path = get_rust_toolchain_libpath()
 
     # don't overwrite existing ld lib path if any...
-    if 'LD_LIBRARY_PATH' in pb.local.env:
-        ld_lib_path += ':' + pb.local.env['LD_LIBRARY_PATH']
+    if "LD_LIBRARY_PATH" in pb.local.env:
+        ld_lib_path += ":" + pb.local.env["LD_LIBRARY_PATH"]
 
     args = []
-    args += ['--ddump-untyped-clang-ast']
+    args += ["--ddump-untyped-clang-ast"]
     args += [cfile]
 
     # import ast
-    with pb.local.env(RUST_BACKTRACE='1',
-                      LD_LIBRARY_PATH=ld_lib_path):
+    with pb.local.env(RUST_BACKTRACE="1", LD_LIBRARY_PATH=ld_lib_path):
         invoke(transpiler, args)
 
     return True  # if we get this far, test passed
@@ -124,11 +125,11 @@ def test_json_c(args: argparse.Namespace) -> bool:
     # unconditionally compile json-c since we don't know if
     # cc_db was generated from the environment we're in.
     with pb.local.cwd(JSON_C_SRC), pb.local.env(CC="clang"):
-        if os.path.isfile('Makefile'):
-            invoke(MAKE['clean'])
+        if os.path.isfile("Makefile"):
+            invoke(MAKE["clean"])  # type: ignore
         configure = pb.local.get("./configure")
         invoke(configure)
-        invoke(BEAR[MAKE[JOBS]])
+        invoke(BEAR[MAKE[JOBS]])  # type: ignore
 
     if not os.path.isfile(cc_db_file):
         die("missing " + cc_db_file, errno.ENOENT)
@@ -156,8 +157,8 @@ def test_lua(args: argparse.Namespace) -> bool:
     rmtree(build_dir, ignore_errors=True)
     os.mkdir(build_dir)
     with pb.local.cwd(build_dir), pb.local.env(CC="clang"):
-        invoke(CMAKE['-DCMAKE_EXPORT_COMPILE_COMMANDS=1', LUA_SRC])
-        invoke(MAKE[JOBS])
+        invoke(CMAKE["-DCMAKE_EXPORT_COMPILE_COMMANDS=1", LUA_SRC])  # type: ignore
+        invoke(MAKE[JOBS])  # type: ignore
 
     cc_db_file = os.path.join(LUA_SRC, "build", c.CC_DB_JSON)
     if not os.path.isfile(cc_db_file):
@@ -179,11 +180,10 @@ def test_ruby(args: argparse.Namespace) -> bool:
 
     # unconditionally compile ruby since we don't know if
     # cc_db was generated from the environment we're in.
-    with pb.local.cwd(RUBY_SRC), pb.local.env(CC="clang",
-                                              cflags="-w"):
+    with pb.local.cwd(RUBY_SRC), pb.local.env(CC="clang", cflags="-w"):
         configure = pb.local.get("./configure")
         invoke(configure)
-        invoke(BEAR[MAKE[JOBS]])
+        invoke(BEAR[MAKE[JOBS]])  # type: ignore
 
     if not os.path.isfile(cc_db_file):
         die("missing " + cc_db_file, errno.ENOENT)
@@ -195,22 +195,31 @@ def parse_args() -> argparse.Namespace:
     """
     define and parse command line arguments here.
     """
-    desc = 'run integration tests.'
+    desc = "run integration tests."
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument(
-        '--only', dest='regex', type=regex,
-        default='.*', help="Regular expression to filter which tests to run"
+        "--only",
+        dest="regex",
+        type=regex,
+        default=".*",
+        help="Regular expression to filter which tests to run",
     )
-    parser.add_argument('-j', '--jobs', type=int, dest="jobs",
-                        default=multiprocessing.cpu_count(),
-                        help='max number of concurrent jobs')
-    parser.add_argument('-v', '--verbose', default=False, dest="verbose",
-                        help='enable verbose output')
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        dest="jobs",
+        default=multiprocessing.cpu_count(),
+        help="max number of concurrent jobs",
+    )
+    parser.add_argument(
+        "-v", "--verbose", default=False, dest="verbose", help="enable verbose output"
+    )
     return parser.parse_args()
 
 
 def main() -> None:
-    global JOBS
+    global JOBS  # noqa: PLW0603
     setup_logging()
     logging.debug("args: %s", " ".join(sys.argv))
 
@@ -224,14 +233,10 @@ def main() -> None:
     ensure_dir(c.BUILD_DIR)
 
     args = parse_args()
-    JOBS = '-j' + str(args.jobs)
+    JOBS = "-j" + str(args.jobs)
 
     # filter what gets tested using `what` argument
-    tests = [test_minimal,
-             test_hello_world,
-             test_json_c,
-             test_ruby,
-             test_lua]
+    tests = [test_minimal, test_hello_world, test_json_c, test_ruby, test_lua]
     tests = [t for t in tests if args.regex.search(t.__name__)]
 
     if not tests:
@@ -249,7 +254,7 @@ def main() -> None:
         logging.info("PASS")
     else:
         logging.info("FAIL")
-        quit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -14,9 +14,9 @@ use crate::{
 };
 
 use super::{
-    backend::{Backend, WriteEvent},
-    skip::{skip_event, SkipReason},
     AnyError, Detect, FINISHED,
+    backend::{Backend, WriteEvent},
+    skip::{SkipReason, skip_event},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

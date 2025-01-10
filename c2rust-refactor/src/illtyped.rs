@@ -6,14 +6,10 @@ use syntax::ast::*;
 use syntax::mut_visit::{self, MutVisitor};
 use syntax::ptr::P;
 
-use crate::ast_manip::MutVisit;
 use crate::RefactorCtxt;
+use crate::ast_manip::MutVisit;
 
-fn types_approx_equal<'tcx>(
-    tcx: TyCtxt<'tcx>,
-    ty1: ty::Ty<'tcx>,
-    ty2: ty::Ty<'tcx>,
-) -> bool {
+fn types_approx_equal<'tcx>(tcx: TyCtxt<'tcx>, ty1: ty::Ty<'tcx>, ty2: ty::Ty<'tcx>) -> bool {
     // Normalizing and erasing regions fixes a few cases where `illtyped` would otherwise falsely
     // report a type error.  Specifically:
     //
@@ -269,7 +265,6 @@ impl<'a, 'tcx, F: IlltypedFolder<'tcx>> MutVisitor for FoldIlltyped<'a, 'tcx, F>
             }
 
             // TODO: handle ExprKind::Paren???
-
             _ => {}
         };
 

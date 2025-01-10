@@ -135,7 +135,7 @@ pub struct Func {
 }
 
 impl Func {
-    fn cmp_fields(&self) -> impl Eq + Hash + Ord + '_ {
+    fn cmp_fields(&self) -> impl Hash + Ord + '_ {
         self.id
     }
 }
@@ -152,6 +152,7 @@ impl Hash for Func {
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Func {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.cmp_fields().partial_cmp(&other.cmp_fields())

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
-import os
 import logging
-from typing import List
+import os
 
 import plumbum as pb
-
+from common import (
+    Colors,
+    die,
+    get_cmd_or_die,
+    get_host_triplet,
+    get_rust_toolchain_libpath,
+    setup_logging,
+)
 from common import (
     config as c,
-    Colors,
-    get_cmd_or_die,
-    get_rust_toolchain_libpath,
-    get_host_triplet,
-    setup_logging,
-    die,
 )
 
 # Tools we will need
@@ -21,7 +21,7 @@ rustfmt = get_cmd_or_die("rustfmt")
 diff = get_cmd_or_die("diff")
 
 
-def get_testcases(directory: str) -> List[str]:
+def get_testcases(directory: str) -> list[str]:
     """
     Find the test cases in a directory
     """
@@ -29,34 +29,35 @@ def get_testcases(directory: str) -> List[str]:
     testcases = []
     scriptnam = "run.sh"
 
-    for root, subdirs, files in os.walk(directory):
+    for root, _subdirs, files in os.walk(directory):
         if scriptnam in files:
             testcases.append(os.path.join(root, scriptnam))
 
     return testcases
 
 
-def run_tests(testcases: List[str]) -> None:
+def run_tests(testcases: list[str]) -> None:
     ipath = os.path.join(c.ROOT_DIR, "target/debug/c2rust-refactor")
     # refactor = '{ip} -P ../.. -p plugin_stub -r alongside'.format(ip=ipath)
     # NOTE:PL: I removed the plugin options (-P, -p) to get the tests to run.
-    refactor = '{ip} -r alongside'.format(ip=ipath)
+    refactor = f"{ipath} -r alongside"
 
     # help plumbum find rust
     ld_lib_path = get_rust_toolchain_libpath()
-    if 'LD_LIBRARY_PATH' in pb.local.env:
-        ld_lib_path += ':' + pb.local.env['LD_LIBRARY_PATH']
+    if "LD_LIBRARY_PATH" in pb.local.env:
+        ld_lib_path += ":" + pb.local.env["LD_LIBRARY_PATH"]
 
     rustflags = "-L {rust_lib_dir}/rustlib/{triplet}/lib"
-    rustflags = rustflags.format(rust_lib_dir=ld_lib_path,
-                                 triplet=get_host_triplet())
+    rustflags = rustflags.format(rust_lib_dir=ld_lib_path, triplet=get_host_triplet())
 
-    with pb.local.env(RUST_BACKTRACE='1',
-                      RUST_LOG="c2rust_refactor=info",
-                      LD_LIBRARY_PATH=ld_lib_path,
-                      not_LD_LIBRARY_PATH=ld_lib_path,
-                      refactor=refactor,
-                      rustflags=rustflags):
+    with pb.local.env(
+        RUST_BACKTRACE="1",
+        RUST_LOG="c2rust_refactor=info",
+        LD_LIBRARY_PATH=ld_lib_path,
+        not_LD_LIBRARY_PATH=ld_lib_path,
+        refactor=refactor,
+        rustflags=rustflags,
+    ):
         for test in testcases:
             script = pb.local.get(test)
             testdir = os.path.dirname(test)
@@ -74,14 +75,14 @@ def run_tests(testcases: List[str]) -> None:
                     new_rust = os.path.join(testdir, "new.rs")
                     diff["-wB", new_rust, old_new_rust].run()
 
-                    print(" {}[ OK ]{} ".format(Colors.OKGREEN, Colors.NO_COLOR) + testname)
+                    print(f" {Colors.OKGREEN}[ OK ]{Colors.NO_COLOR} " + testname)
                     logging.debug(" [ OK ] " + testname)
-            except pb.ProcessExecutionError as pee:
-                print(" {}[FAIL]{} ".format(Colors.FAIL, Colors.NO_COLOR) + testname)
+            except pb.ProcessExecutionError:
+                print(f" {Colors.FAIL}[FAIL]{Colors.NO_COLOR} " + testname)
                 logging.debug(" [FAIL] " + testname)
                 logfile = os.path.join(testdir, "log")
                 if os.path.exists(logfile):
-                    with open(logfile, "r") as fh:
+                    with open(logfile, encoding="utf-8") as fh:
                         lines = fh.readlines()
                         logging.debug("".join(lines))
 

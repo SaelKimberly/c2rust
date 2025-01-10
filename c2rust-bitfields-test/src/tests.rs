@@ -1,9 +1,11 @@
+#![allow(dead_code, unused_imports)]
 use c2rust_bitfields::BitfieldStruct;
+use core::f64;
 use libc::{c_double, c_short, c_uchar, c_uint, c_ulong, c_ushort};
 use std::mem::{size_of, transmute};
 
 #[link(name = "test")]
-extern "C" {
+unsafe extern "C" {
     fn check_compact_date(_: *const CompactDate, _: c_uchar, _: c_uchar, _: c_ushort) -> c_uint;
     fn assign_compact_date_day(_: *mut CompactDate, _: c_uchar);
     fn check_overlapping_byte_date(
@@ -214,10 +216,9 @@ fn test_overlapping_byte_date() {
 
     let date_bytes: [u8; 8] = unsafe { transmute(date) };
 
-    assert_eq!(
-        date_bytes,
-        [0b10011111, 0b00000001, 0b11100010, 0b00000111, 0b0, 0b0, 0b0, 0b0]
-    );
+    assert_eq!(date_bytes, [
+        0b10011111, 0b00000001, 0b11100010, 0b00000111, 0b0, 0b0, 0b0, 0b0
+    ]);
     // 10011111 | 00000001 | 11100010 | 00000111 | 0b0 | 0b0 | 0b0 | 0b0
     // 12/\-31- |        - | -2014--> | <--2014-
 
@@ -244,10 +245,9 @@ fn test_overlapping_byte_date2() {
 
     let date_bytes: [u8; 8] = unsafe { transmute(date) };
 
-    assert_eq!(
-        date_bytes,
-        [0b00001110, 0b00000001, 0b11100011, 0b00000111, 0b0, 0b0, 0b0, 0b0]
-    );
+    assert_eq!(date_bytes, [
+        0b00001110, 0b00000001, 0b11100011, 0b00000111, 0b0, 0b0, 0b0, 0b0
+    ]);
 }
 
 // *** Dumping AST Record Layout
@@ -280,14 +280,14 @@ fn test_unnamed_bitfield() {
         _pad: [0; 1],
     };
 
-    unnamed_bitfield.z = 3.14;
+    unnamed_bitfield.z = f64::consts::PI;
     unnamed_bitfield.set_x(30);
     unnamed_bitfield.set_y(505);
 
     assert_eq!(unnamed_bitfield.x(), 30);
     assert_eq!(unnamed_bitfield.y(), 505);
 
-    let ret = unsafe { check_unnamed_bitfield(&unnamed_bitfield, 30, 505, 3.14) };
+    let ret = unsafe { check_unnamed_bitfield(&unnamed_bitfield, 30, 505, f64::consts::PI) };
 
     assert_eq!(ret, 1);
 }
@@ -582,7 +582,7 @@ struct BoolBits {
 #[test]
 fn test_bool_bits() {
     let mut bool_bits = BoolBits {
-        x_y_z: [u8::max_value(); 1],
+        x_y_z: [u8::MAX; 1],
     };
 
     assert!(bool_bits.x());

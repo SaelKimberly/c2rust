@@ -1,7 +1,7 @@
 use super::constraint_set::{CTy, ConstraintSet, VarTable};
 use crate::context::{AnalysisCtxt, LTy, PointerId};
 use crate::panic_detail;
-use crate::util::{describe_rvalue, ty_callee, Callee, RvalueDesc, UnknownDefCallee};
+use crate::util::{Callee, RvalueDesc, UnknownDefCallee, describe_rvalue, ty_callee};
 use log::*;
 use rustc_middle::mir::{
     BinOp, Body, Location, Operand, Place, PlaceRef, ProjectionElem, Rvalue, Statement,
@@ -172,8 +172,7 @@ impl<'tcx> TypeChecker<'tcx, '_> {
     pub fn visit_statement(&mut self, stmt: &Statement<'tcx>, loc: Location) {
         trace!(
             "visit_statement({:?} @ {:?})",
-            stmt.kind,
-            stmt.source_info.span
+            stmt.kind, stmt.source_info.span
         );
         let _g = panic_detail::set_current_span(stmt.source_info.span);
 
@@ -194,8 +193,7 @@ impl<'tcx> TypeChecker<'tcx, '_> {
     pub fn visit_terminator(&mut self, term: &Terminator<'tcx>, _loc: Location) {
         trace!(
             "visit_terminator({:?} @ {:?})",
-            term.kind,
-            term.source_info.span
+            term.kind, term.source_info.span
         );
         let _g = panic_detail::set_current_span(term.source_info.span);
         let tcx = self.acx.tcx();
@@ -364,21 +362,15 @@ pub fn visit<'tcx>(
 
     for (bb, bb_data) in mir.basic_blocks().iter_enumerated() {
         for (i, stmt) in bb_data.statements.iter().enumerate() {
-            tc.visit_statement(
-                stmt,
-                Location {
-                    block: bb,
-                    statement_index: i,
-                },
-            );
-        }
-        tc.visit_terminator(
-            bb_data.terminator(),
-            Location {
-                statement_index: bb_data.statements.len(),
+            tc.visit_statement(stmt, Location {
                 block: bb,
-            },
-        );
+                statement_index: i,
+            });
+        }
+        tc.visit_terminator(bb_data.terminator(), Location {
+            statement_index: bb_data.statements.len(),
+            block: bb,
+        });
     }
 
     tc.constraints

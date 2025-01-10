@@ -5,7 +5,7 @@
     box_patterns,
     generator_trait,
     drain_filter,
-    label_break_value,
+    label_break_value
 )]
 #![cfg_attr(feature = "profile", feature(proc_macro_hygiene))]
 
@@ -203,13 +203,13 @@ fn get_rustc_arg_strings(src: RustcArgSource) -> Vec<RustcArgs> {
 
 #[cfg_attr(feature = "profile", flame)]
 fn get_rustc_cargo_args(target_type: CargoTarget) -> Vec<RustcArgs> {
+    use cargo::Config;
     use cargo::core::compiler::{CompileMode, Context, DefaultExecutor, Executor, Unit};
-    use cargo::core::{maybe_allow_nightly_features, PackageId, Target, Workspace, Verbosity};
+    use cargo::core::{PackageId, Target, Verbosity, Workspace, maybe_allow_nightly_features};
     use cargo::ops;
     use cargo::ops::CompileOptions;
     use cargo::util::important_paths::find_root_manifest_for_wd;
     use cargo::util::{CargoResult, ProcessBuilder};
-    use cargo::Config;
     use std::sync::Mutex;
 
     // `cargo`-built `libcargo` is always on the `dev` channel, so `maybe_allow_nightly_features`
@@ -262,7 +262,11 @@ fn get_rustc_cargo_args(target_type: CargoTarget) -> Vec<RustcArgs> {
             // we refactor dependencies before crates that depend on them, but
             // for now we don't support workspaces, so there can only be one
             // lib.
-            let args = RustcArgs { kind: Some(target.kind().clone()), args, cwd };
+            let args = RustcArgs {
+                kind: Some(target.kind().clone()),
+                args,
+                cwd,
+            };
             if let TargetKind::Lib(..) = target.kind() {
                 g.insert(0, args);
             } else {
@@ -288,7 +292,8 @@ fn get_rustc_cargo_args(target_type: CargoTarget) -> Vec<RustcArgs> {
             _on_stderr_line: &mut dyn FnMut(&str) -> CargoResult<()>,
         ) -> CargoResult<()> {
             self.maybe_record_cmd(&cmd, &id, target);
-            self.default.exec(cmd, id, target, mode, &mut |_| Ok(()), &mut |_| Ok(()))
+            self.default
+                .exec(cmd, id, target, mode, &mut |_| Ok(()), &mut |_| Ok(()))
         }
 
         fn force_rebuild(&self, unit: &Unit) -> bool {
@@ -321,12 +326,12 @@ fn get_rustc_cargo_args(target_type: CargoTarget) -> Vec<RustcArgs> {
 }
 
 fn rebuild() {
+    use cargo::Config;
     use cargo::core::compiler::CompileMode;
-    use cargo::core::{Workspace, Verbosity};
+    use cargo::core::{Verbosity, Workspace};
     use cargo::ops;
     use cargo::ops::CompileOptions;
     use cargo::util::important_paths::find_root_manifest_for_wd;
-    use cargo::Config;
 
     let config = Config::default().unwrap();
     config.shell().set_verbosity(Verbosity::Quiet);
@@ -380,8 +385,7 @@ fn main_impl(opts: Options) -> interface::Result<()> {
         }
 
         if let Some(ref cwd) = rustc_args.cwd {
-            env::set_current_dir(cwd)
-                .expect("Error changing current directory");
+            env::set_current_dir(cwd).expect("Error changing current directory");
         }
 
         // TODO: interface::run_compiler() here and create a RefactorState with the
@@ -394,9 +398,10 @@ fn main_impl(opts: Options) -> interface::Result<()> {
                 compiler.enter(|queries| {
                     let expanded_crate = queries.expansion().unwrap().take().0;
                     for c in &opts.cursors {
-                        let kind_result = c.kind.clone().map_or(Ok(pick_node::NodeKind::Any), |s| {
-                            pick_node::NodeKind::from_str(&s)
-                        });
+                        let kind_result =
+                            c.kind.clone().map_or(Ok(pick_node::NodeKind::Any), |s| {
+                                pick_node::NodeKind::from_str(&s)
+                            });
                         let kind = match kind_result {
                             Ok(k) => k,
                             Err(_) => {
@@ -455,7 +460,8 @@ fn main_impl(opts: Options) -> interface::Result<()> {
                 config,
                 cmd_reg,
                 opts.rewrite_modes.clone(),
-            ).expect("Error loading user script");
+            )
+            .expect("Error loading user script");
         } else {
             let file_io = Arc::new(file_io::RealFileIO::new(opts.rewrite_modes.clone()));
             driver::run_refactoring(config, cmd_reg, file_io, marks, |mut state| {

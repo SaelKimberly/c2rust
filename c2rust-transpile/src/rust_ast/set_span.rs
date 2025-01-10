@@ -1,6 +1,7 @@
 pub use c2rust_ast_printer::pprust::BytePos;
 use proc_macro2::Span;
 use syn::*;
+use token::Box;
 
 /// Set the span of an AST node.
 pub trait SetSpan {
@@ -95,10 +96,10 @@ syn::ForeignItem
 impl SetSpan for Stmt {
     fn set_span(&mut self, s: Span) {
         match self {
-            Stmt::Expr(e) => e.set_span(s),
+            Stmt::Expr(e, _) => e.set_span(s),
             Stmt::Local(l) => l.set_span(s),
             Stmt::Item(i) => i.set_span(s),
-            Stmt::Semi(e, _) => e.set_span(s),
+            _ => panic!("could not set span on Stmt: {}", self),
         }
     }
 }

@@ -15,14 +15,14 @@
 //!   - convert the `Vec<Structure<Stmt>>` back into a `Vec<Stmt>`
 //!
 
-use crate::c_ast::iterators::{DFExpr, SomeId};
 use crate::c_ast::CLabelId;
+use crate::c_ast::iterators::{DFExpr, SomeId};
 use crate::diagnostics::TranslationResult;
 use crate::rust_ast::SpanExt;
 use c2rust_ast_printer::pprust;
 use proc_macro2::Span;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeSet;
+use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -30,7 +30,7 @@ use std::io;
 use std::io::Write;
 use std::ops::Deref;
 use std::ops::Index;
-use syn::{spanned::Spanned, Arm, Expr, Pat, Stmt};
+use syn::{Arm, Expr, Pat, Stmt, spanned::Spanned};
 
 use failure::format_err;
 use indexmap::indexset;
@@ -1195,16 +1195,13 @@ impl CfgBuilder {
             live,
             span,
         } = wip;
-        self.add_block(
-            label,
-            BasicBlock {
-                body,
-                terminator,
-                defined,
-                live,
-                span,
-            },
-        );
+        self.add_block(label, BasicBlock {
+            body,
+            terminator,
+            defined,
+            live,
+            span,
+        });
     }
 
     /// Update the terminator of an existing block. This is for the special cases where you don't
@@ -1445,14 +1442,11 @@ impl CfgBuilder {
                 wip.extend(stmts);
 
                 let cond_val = translator.ast_context[scrutinee].kind.get_bool();
-                self.add_wip_block(
-                    wip,
-                    match cond_val {
-                        Some(true) => Jump(then_entry.clone()),
-                        Some(false) => Jump(else_entry.clone()),
-                        None => Branch(val, then_entry.clone(), else_entry.clone()),
-                    },
-                );
+                self.add_wip_block(wip, match cond_val {
+                    Some(true) => Jump(then_entry.clone()),
+                    Some(false) => Jump(else_entry.clone()),
+                    None => Branch(val, then_entry.clone(), else_entry.clone()),
+                });
 
                 // Then case
                 self.open_arm(then_entry.clone());
@@ -1513,14 +1507,11 @@ impl CfgBuilder {
                 let mut cond_wip = self.new_wip_block(cond_entry.clone());
                 cond_wip.extend(stmts);
 
-                self.add_wip_block(
-                    cond_wip,
-                    match cond_val {
-                        Some(true) => Jump(body_entry.clone()),
-                        Some(false) => Jump(next_entry.clone()),
-                        None => Branch(val, body_entry.clone(), next_entry.clone()),
-                    },
-                );
+                self.add_wip_block(cond_wip, match cond_val {
+                    Some(true) => Jump(body_entry.clone()),
+                    Some(false) => Jump(next_entry.clone()),
+                    None => Branch(val, body_entry.clone(), next_entry.clone()),
+                });
 
                 // Body
                 let saw_unmatched_break = self.last_per_stmt_mut().saw_unmatched_break;
@@ -1581,14 +1572,11 @@ impl CfgBuilder {
                 let cond_val = translator.ast_context[condition].kind.get_bool();
                 let mut cond_wip = self.new_wip_block(cond_entry);
                 cond_wip.extend(stmts);
-                self.add_wip_block(
-                    cond_wip,
-                    match cond_val {
-                        Some(true) => Jump(body_entry),
-                        Some(false) => Jump(next_entry.clone()),
-                        None => Branch(val, body_entry, next_entry.clone()),
-                    },
-                );
+                self.add_wip_block(cond_wip, match cond_val {
+                    Some(true) => Jump(body_entry),
+                    Some(false) => Jump(next_entry.clone()),
+                    None => Branch(val, body_entry, next_entry.clone()),
+                });
 
                 self.close_loop();
 
@@ -1632,14 +1620,11 @@ impl CfgBuilder {
                         let cond_val = translator.ast_context[cond].kind.get_bool();
                         let mut cond_wip = slf.new_wip_block(cond_entry.clone());
                         cond_wip.extend(stmts);
-                        slf.add_wip_block(
-                            cond_wip,
-                            match cond_val {
-                                Some(true) => Jump(body_entry.clone()),
-                                Some(false) => Jump(next_label.clone()),
-                                None => Branch(val, body_entry.clone(), next_label.clone()),
-                            },
-                        );
+                        slf.add_wip_block(cond_wip, match cond_val {
+                            Some(true) => Jump(body_entry.clone()),
+                            Some(false) => Jump(next_label.clone()),
+                            None => Branch(val, body_entry.clone(), next_label.clone()),
+                        });
                     } else {
                         slf.add_block(cond_entry.clone(), BasicBlock::new_jump(body_entry.clone()));
                     }

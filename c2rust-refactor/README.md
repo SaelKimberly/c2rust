@@ -8,7 +8,6 @@
 This is a refactoring tool for Rust programs, aimed at removing unsafety from
 automatically-generated Rust code.
 
-
 ## Usage
 
 `c2rust refactor` command line usage is as follows:
@@ -18,7 +17,7 @@ automatically-generated Rust code.
 Flags for `c2rust refactor` are described by `c2rust refactor --help`.
 
 See [the command documentation (online manual)](https://c2rust.com/manual/c2rust-refactor/commands.html)
-for a list of commands, including complete usage and descriptions. 
+for a list of commands, including complete usage and descriptions.
 Multiple commands can be separated by an argument consisting of a single
 semicolon, as in `c2rust refactor cmd1 arg1 \; cmd2 arg2`.
 (Note the semicolon needs to be escaped to prevent it from being interpreted by
@@ -30,7 +29,6 @@ For projects built with `cargo`, pass the `--cargo` flag to `c2rust refactor`
 and it will obtain the right arguments from `cargo` automatically.  Otherwise,
 you must provide the `rustc` arguments on the `c2rust refactor` command line,
 after a `--` separator.
-
 
 ## Marks
 

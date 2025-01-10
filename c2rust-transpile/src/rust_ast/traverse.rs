@@ -115,7 +115,7 @@ pub fn traverse_stmt_def<W: Traversal>(walk: &mut W, s: Stmt) -> Stmt {
     match s {
         Stmt::Local(p_local) => Stmt::Local(p_local.traverse(walk)),
         Stmt::Item(p_item) => Stmt::Item(p_item.traverse(walk)),
-        Stmt::Expr(p_expr) => Stmt::Expr(p_expr.traverse(walk)),
+        Stmt::Expr(p_expr, semi) => Stmt::Expr(p_expr.traverse(walk), semi),
         Stmt::Semi(p_expr, semi) => Stmt::Semi(p_expr.traverse(walk), semi),
     }
 }
@@ -218,8 +218,8 @@ pub fn traverse_expr_def<W: Traversal>(walk: &mut W, e: Expr) -> Expr {
             ..e
         }),
         Expr::Range(e) => Expr::Range(ExprRange {
-            from: e.from.traverse(walk),
-            to: e.to.traverse(walk),
+            start: e.from.traverse(walk),
+            end: e.to.traverse(walk),
             ..e
         }),
         Expr::Path(e) => Expr::Path(ExprPath { ..e }),

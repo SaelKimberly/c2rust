@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
-import os
-import sys
-import shutil
-import logging
 import argparse
+import logging
+import os
+import shutil
+import sys
 
 from common import (
     config as c,
-    pb,
-    get_cmd_or_die,
+)
+from common import (
     download_archive,
-    die,
+    ensure_dir,
     est_parallel_link_jobs,
+    get_cmd_or_die,
+    git_ignore_dir,
+    install_sig,
     invoke,
     invoke_quietly,
-    install_sig,
-    ensure_dir,
     on_mac,
+    pb,
     setup_logging,
-    git_ignore_dir,
-    get_ninja_build_type,
 )
 
 
-def download_llvm_sources() -> None:
+def download_llvm_sources() -> None:  # noqa: C901
     tar = get_cmd_or_die("tar")
 
     if not c.LLVM_SKIP_SIGNATURE_CHECKS:
@@ -36,16 +36,17 @@ def download_llvm_sources() -> None:
 
     with pb.local.cwd(c.BUILD_DIR):
         # download archives and signatures
-        for (aurl, asig, afile, _) in zip(
-                c.LLVM_ARCHIVE_URLS,
-                c.LLVM_SIGNATURE_URLS,
-                c.LLVM_ARCHIVE_FILES,
-                c.LLVM_ARCHIVE_DIRS):
+        for aurl, asig, afile, _ in zip(
+            c.LLVM_ARCHIVE_URLS,
+            c.LLVM_SIGNATURE_URLS,
+            c.LLVM_ARCHIVE_FILES,
+            c.LLVM_ARCHIVE_DIRS,
+            strict=False,
+        ):
+            asig_ = None if c.LLVM_SKIP_SIGNATURE_CHECKS else asig
 
-            if c.LLVM_SKIP_SIGNATURE_CHECKS:
-                asig = None  # type: ignore
             # download archive and (by default) its signature
-            download_archive(aurl, afile, asig)
+            download_archive(aurl, afile, asig_)
 
     # first extract llvm archive,
     if not os.path.isdir(c.LLVM_SRC):
@@ -77,14 +78,17 @@ def download_llvm_sources() -> None:
             logging.info("extracting %s", c.LLVM_ARCHIVE_FILES[3])
             cmake_modules_dir = os.path.join(c.LLVM_SRC, "cmake", "modules")
             # extract *.cmake files into llvm/cmake/modules
-            tar("xf", c.LLVM_ARCHIVE_FILES[3],
+            tar(
+                "xf",
+                c.LLVM_ARCHIVE_FILES[3],
                 "--strip-components=2",
-                "--directory", cmake_modules_dir)
+                "--directory",
+                cmake_modules_dir,
+            )
 
         if major > 15:
             # workaround for https://stackoverflow.com/questions/75787113
-            cmake_symlink_dir = os.path.join(c.LLVM_SRC, os.pardir, "cmake",
-                                                "Modules")
+            cmake_symlink_dir = os.path.join(c.LLVM_SRC, os.pardir, "cmake", "Modules")
             cmake_symlink_dir = os.path.abspath(cmake_symlink_dir)
             ensure_dir(os.path.join(c.LLVM_SRC, os.pardir, "cmake"))
             if not os.path.exists(cmake_symlink_dir):
@@ -92,8 +96,7 @@ def download_llvm_sources() -> None:
 
         if major >= 17:
             # similar to above workaround but for compiler-rt
-            cmake_symlink_dir = os.path.join(c.LLVM_SRC, "projects", "cmake",
-                                                "Modules")
+            cmake_symlink_dir = os.path.join(c.LLVM_SRC, "projects", "cmake", "Modules")
             ensure_dir(os.path.join(c.LLVM_SRC, "projects", "cmake"))
             if not os.path.exists(cmake_symlink_dir):
                 os.symlink(cmake_modules_dir, cmake_symlink_dir)
@@ -105,27 +108,30 @@ def configure_and_build_llvm(args: argparse.Namespace) -> None:
     """
     # Possible values are Release, Debug, RelWithDebInfo and MinSizeRel
     build_type = "Debug" if args.debug else "RelWithDebInfo"
-    ninja_build_file = os.path.join(c.LLVM_BLD, "build.ninja")
+    _ninja_build_file = os.path.join(c.LLVM_BLD, "build.ninja")
     with pb.local.cwd(c.LLVM_BLD):
         cmake = get_cmd_or_die("cmake")
         max_link_jobs = est_parallel_link_jobs()
         assertions = "1" if args.assertions else "0"
-        cargs = ["-G", "Ninja", c.LLVM_SRC,
-                    "-Wno-dev",
-                    "-DLLVM_ENABLE_ZSTD=0",
-                    "-DLLVM_INCLUDE_TESTS=0",
-                    "-DCOMPILER_RT_INCLUDE_TESTS=0",
-                    "-DCMAKE_INSTALL_PREFIX=" + c.LLVM_INSTALL,
-                    "-DCMAKE_BUILD_TYPE=" + build_type,
-                    "-DLLVM_PARALLEL_LINK_JOBS={}".format(max_link_jobs),
-                    "-DLLVM_ENABLE_ASSERTIONS=" + assertions,
-                    "-DCMAKE_EXPORT_COMPILE_COMMANDS=1",
-                    "-DLLVM_TARGETS_TO_BUILD=host",
-                    "-DLLVM_INCLUDE_BENCHMARKS=0",
-                    "-DCOMPILER_RT_ENABLE_IOS=OFF",
+        cargs = [
+            "-G",
+            "Ninja",
+            c.LLVM_SRC,
+            "-Wno-dev",
+            "-DLLVM_ENABLE_ZSTD=0",
+            "-DLLVM_INCLUDE_TESTS=0",
+            "-DCOMPILER_RT_INCLUDE_TESTS=0",
+            "-DCMAKE_INSTALL_PREFIX=" + c.LLVM_INSTALL,
+            "-DCMAKE_BUILD_TYPE=" + build_type,
+            f"-DLLVM_PARALLEL_LINK_JOBS={max_link_jobs}",
+            "-DLLVM_ENABLE_ASSERTIONS=" + assertions,
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=1",
+            "-DLLVM_TARGETS_TO_BUILD=host",
+            "-DLLVM_INCLUDE_BENCHMARKS=0",
+            "-DCOMPILER_RT_ENABLE_IOS=OFF",
         ]
 
-        invoke(cmake[cargs])
+        invoke(cmake[cargs])  # type: ignore
 
         # We must install headers here so our clang tool can reference
         # compiler-internal headers such as stddef.h. This reference is
@@ -135,55 +141,57 @@ def configure_and_build_llvm(args: argparse.Namespace) -> None:
         nice = get_cmd_or_die("nice")
         ninja = get_cmd_or_die("ninja")
         nice_args = [
-            '-n', '19', str(ninja),
-            'clangAST',
-            'clangFrontend',
-            'clangTooling',
-            'clangBasic',
-            'clangASTMatchers',
-            'clangParse',
-            'clangSerialization',
-            'clangSema',
-            'clangEdit',
-            'clangAnalysis',
-            'clangDriver',
-            'clangFormat',
-            'clangToolingCore',
-            'clangRewrite',
-            'clangLex',
-            'LLVMMC',
-            'LLVMMCParser',
-            'LLVMDemangle',
-            'LLVMSupport',
-            'LLVMOption',
-            'LLVMBinaryFormat',
-            'LLVMCore',
-            'LLVMBitReader',
-            'LLVMProfileData',
-            'llvm-config',
-            'install-clang-headers', 'install-compiler-rt-headers',
-            'FileCheck', 'count', 'not']
+            "-n",
+            "19",
+            str(ninja),
+            "clangAST",
+            "clangFrontend",
+            "clangTooling",
+            "clangBasic",
+            "clangASTMatchers",
+            "clangParse",
+            "clangSerialization",
+            "clangSema",
+            "clangEdit",
+            "clangAnalysis",
+            "clangDriver",
+            "clangFormat",
+            "clangToolingCore",
+            "clangRewrite",
+            "clangLex",
+            "LLVMMC",
+            "LLVMMCParser",
+            "LLVMDemangle",
+            "LLVMSupport",
+            "LLVMOption",
+            "LLVMBinaryFormat",
+            "LLVMCore",
+            "LLVMBitReader",
+            "LLVMProfileData",
+            "llvm-config",
+            "install-clang-headers",
+            "install-compiler-rt-headers",
+            "FileCheck",
+            "count",
+            "not",
+        ]
         (major_str, _minor, _point) = c.LLVM_VER.split(".")
         major = int(major_str)
         if major >= 7 and major < 10:
-            nice_args += [
-                'LLVMDebugInfoMSF',
-                'LLVMDebugInfoCodeView']
+            nice_args += ["LLVMDebugInfoMSF", "LLVMDebugInfoCodeView"]
         if major > 8:
             nice_args.append("install-clang-resource-headers")
         if major == 9:
-            nice_args += [
-                'LLVMBitstreamReader',
-                'LLVMRemarks']
+            nice_args += ["LLVMBitstreamReader", "LLVMRemarks"]
         if major >= 10:
             nice_args.append("LLVMFrontendOpenMP")
         if args.with_clang:
-            nice_args.append('clang')
+            nice_args.append("clang")
         invoke(nice, *nice_args)
 
         # Make sure install/bin exists so that we can create a relative path
         # using it in AstExporter.cpp
-        os.makedirs(os.path.join(c.LLVM_INSTALL, 'bin'), exist_ok=True)
+        os.makedirs(os.path.join(c.LLVM_INSTALL, "bin"), exist_ok=True)
 
 
 def need_cargo_clean(args: argparse.Namespace) -> bool:
@@ -198,15 +206,15 @@ def need_cargo_clean(args: argparse.Namespace) -> bool:
 
     find = get_cmd_or_die("find")
     _retcode, stdout, _ = invoke_quietly(find, c.BUILD_DIR, "-cnewer", c2rust)
-    include_pattern = "install/lib/clang/{ver}/include".format(ver=c.LLVM_VER)
+    include_pattern = f"install/lib/clang/{c.LLVM_VER}/include"
     for line in stdout.split("\n")[:-1]:  # skip empty last line
-        if line.endswith("install_manifest_clang-headers.txt") or \
-                line.endswith("ninja_log") or \
-                include_pattern in line:
+        if (
+            line.endswith(("install_manifest_clang-headers.txt", "ninja_log"))
+            or include_pattern in line
+        ):
             continue
-        else:
-            logging.debug("need_cargo_clean:True:%s", line)
-            return True
+        logging.debug("need_cargo_clean:True:%s", line)
+        return True
     logging.debug("need_cargo_clean:False")
     return False
 
@@ -227,8 +235,7 @@ def build_transpiler(args: argparse.Namespace) -> None:
         build_flags.append("-vv")
 
     llvm_config = os.path.join(c.LLVM_BLD, "bin/llvm-config")
-    assert os.path.isfile(llvm_config), \
-        "expected llvm_config at " + llvm_config
+    assert os.path.isfile(llvm_config), "expected llvm_config at " + llvm_config
 
     if on_mac():
         llvm_system_libs = "-lz -lcurses -lm -lxml2"
@@ -243,44 +250,91 @@ def build_transpiler(args: argparse.Namespace) -> None:
     # which means that our `cargo` invocation picks up the system
     # libraries even when we're trying to link against libs we built.
     # https://docs.rs/pkg-config/0.3.14/pkg_config/
-    with pb.local.cwd(c.C2RUST_DIR):
-        with pb.local.env(LIBCURL_NO_PKG_CONFIG=1,
-                          ZLIB_NO_PKG_CONFIG=1,
-                          LLVM_CONFIG_PATH=llvm_config,
-                          LLVM_LIB_DIR=llvm_libdir,
-                          LLVM_SYSTEM_LIBS=llvm_system_libs):
-            invoke(nice, *build_flags)
+    with (
+        pb.local.cwd(c.C2RUST_DIR),
+        pb.local.env(
+            LIBCURL_NO_PKG_CONFIG=1,
+            ZLIB_NO_PKG_CONFIG=1,
+            LLVM_CONFIG_PATH=llvm_config,
+            LLVM_LIB_DIR=llvm_libdir,
+            LLVM_SYSTEM_LIBS=llvm_system_libs,
+        ),
+    ):
+        invoke(nice, *build_flags)
 
 
 def _parse_args() -> argparse.Namespace:
     """
     define and parse command line arguments here.
     """
-    desc = 'download dependencies for the AST exporter and built it.'
+    desc = "download dependencies for the AST exporter and built it."
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument('-c', '--clean-all', default=False,
-                        action='store_true', dest='clean_all',
-                        help='clean everything before building')
-    parser.add_argument('--with-clang', default=False,
-                        action='store_true', dest='with_clang',
-                        help='build clang with this tool')
-    llvm_ver_help = 'fetch and build specified version of clang/LLVM (default: {})'.format(c.LLVM_VER)
+    parser.add_argument(
+        "-c",
+        "--clean-all",
+        default=False,
+        action="store_true",
+        dest="clean_all",
+        help="clean everything before building",
+    )
+    parser.add_argument(
+        "--with-clang",
+        default=False,
+        action="store_true",
+        dest="with_clang",
+        help="build clang with this tool",
+    )
+    llvm_ver_help = (
+        f"fetch and build specified version of clang/LLVM (default: {c.LLVM_VER})"
+    )
     # FIXME: build this list by globbing for scripts/llvm-*.0.*-key.asc
-    llvm_ver_choices = ["6.0.0", "6.0.1", "7.0.0", "7.0.1", "8.0.0", "9.0.0",
-        "10.0.0", "10.0.1", "11.0.0", "11.1.0", "12.0.0", "15.0.1", "16.0.6",
-        "17.0.6", "18.1.1"]
-    parser.add_argument('--with-llvm-version', default=None,
-                        action='store', dest='llvm_ver',
-                        help=llvm_ver_help, choices=llvm_ver_choices)
-    parser.add_argument('--without-assertions', default=True,
-                        action='store_false', dest='assertions',
-                        help='build the tool and clang without assertions')
-    parser.add_argument('-v', '--verbose', default=False,
-                        action='store_true', dest='verbose',
-                        help='emit verbose information during build')
-    parser.add_argument('--skip-signature-checks', default=False,
-                        action='store_true', dest='llvm_skip_signature_checks',
-                        help='skip signature check of source code archives')
+    llvm_ver_choices = [
+        "6.0.0",
+        "6.0.1",
+        "7.0.0",
+        "7.0.1",
+        "8.0.0",
+        "9.0.0",
+        "10.0.0",
+        "10.0.1",
+        "11.0.0",
+        "11.1.0",
+        "12.0.0",
+        "15.0.1",
+        "16.0.6",
+        "17.0.6",
+        "18.1.1",
+    ]
+    parser.add_argument(
+        "--with-llvm-version",
+        default=None,
+        action="store",
+        dest="llvm_ver",
+        help=llvm_ver_help,
+        choices=llvm_ver_choices,
+    )
+    parser.add_argument(
+        "--without-assertions",
+        default=True,
+        action="store_false",
+        dest="assertions",
+        help="build the tool and clang without assertions",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        default=False,
+        action="store_true",
+        dest="verbose",
+        help="emit verbose information during build",
+    )
+    parser.add_argument(
+        "--skip-signature-checks",
+        default=False,
+        action="store_true",
+        dest="llvm_skip_signature_checks",
+        help="skip signature check of source code archives",
+    )
 
     c.add_args(parser)
     args = parser.parse_args()
@@ -292,15 +346,15 @@ def _parse_args() -> argparse.Namespace:
 def binary_in_path(binary_name: str) -> bool:
     try:
         # raises CommandNotFound exception if not available.
-        _ = pb.local[binary_name]  # noqa: F841
-        return True
+        _ = pb.local[binary_name]
     except pb.CommandNotFound:
         return False
+    else:
+        return True
 
 
 def c2rust_bin_path(args: argparse.Namespace) -> str:
-    c2rust_bin_path = 'target/debug/c2rust' if args.debug \
-                      else 'target/release/c2rust'
+    c2rust_bin_path = "target/debug/c2rust" if args.debug else "target/release/c2rust"
     c2rust_bin_path = os.path.join(c.ROOT_DIR, c2rust_bin_path)
 
     abs_curdir = os.path.abspath(os.path.curdir)

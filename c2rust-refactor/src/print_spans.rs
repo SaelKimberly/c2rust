@@ -2,10 +2,10 @@
 use syntax;
 use syntax::ast::*;
 use syntax::print::pprust;
-use syntax::source_map::{SourceMap, Span, DUMMY_SP};
+use syntax::source_map::{DUMMY_SP, SourceMap, Span};
 use syntax::visit::Visitor;
 
-use crate::ast_manip::{visit_nodes, Visit};
+use crate::ast_manip::{Visit, visit_nodes};
 use crate::command::{DriverCommand, Registry};
 use crate::driver::Phase;
 
